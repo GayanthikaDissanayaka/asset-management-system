@@ -1,0 +1,810 @@
+
+
+:root {
+  /* --- EDL brand --- */
+  --edl-maroon:        #6B002C;
+  --edl-maroon-deep:   #2b0816;
+  --edl-maroon-light:  #520b29;
+  --edl-yellow:        #FEF200;
+  --edl-yellow-deep:   #E4D900;
+  --edl-yellow-soft:   #FFFACC;
+
+  /* --- surfaces --- */
+  --surface:           #FFFFFF;
+  --surface-sunken:    #F8F5F6;
+  --surface-raised:    #FDFBFC;
+  --border:            #E4DADE;
+  --border-strong:     #CBB8C0;
+
+  /* --- text --- */
+  --text:              #24101A;
+  --text-muted:        #6F5C65;
+  --text-inverse:      #FFFFFF;
+
+  /* --- status --- */
+  --ok:                #1F7A4C;
+  --ok-bg:             #EEF8F2;
+  --warn:              #8F6200;
+  --warn-bg:           #FFF8E3;
+  --danger:            #460712;
+  --danger-bg:         #FDF1F3;
+  --info:              var(--edl-maroon);
+  --info-bg:           #FAEFF3;
+
+  --shadow-sm: 0 1px 2px rgba(36, 16, 26, 0.07);
+  --shadow-md: 0 4px 16px rgba(36, 16, 26, 0.11);
+  --shadow-lg: 0 16px 42px rgba(36, 16, 26, 0.20);
+
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+
+.auth-shell,
+.welcome-page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* =====================================================================
+   BRAND LOCKUP
+   ===================================================================== */
+
+.brand-lockup { display: inline-flex; align-items: center; gap: 13px; }
+
+/* White disc behind the roundel keeps the maroon sunburst legible on a
+   dark panel, and matches how the mark sits on EDL stationery. */
+.brand-mark {
+  border-radius: 50%;
+  background: #FFFFFF;
+  padding: 3px;
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.24);
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* The full lockup already carries its own white field. The asset is trimmed
+   to the artwork, so the plate only needs enough padding to breathe. Width
+   and height come from the img attributes; object-fit guards the ratio. */
+.brand-full {
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
+  background: #FFFFFF;
+  border-radius: var(--radius);
+  padding: 9px 13px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.22);
+}
+
+.brand-words {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.22;
+  color: #FFFFFF;
+}
+
+.brand-words span:first-child { font-weight: 690; letter-spacing: -0.01em; }
+.brand-words span:last-child  { font-weight: 500; color: rgba(255,255,255,0.74); }
+
+/* =====================================================================
+   WELCOME PAGE
+   ===================================================================== */
+
+.welcome-page {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-sunken);
+}
+
+.welcome-nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 6vw;
+}
+
+.welcome-nav-actions { display: flex; gap: 10px; }
+
+/* Deep maroon field. The sunburst and lattice below are drawn on top. */
+.welcome-hero {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
+  gap: 56px;
+  align-items: center;
+  padding: 122px 6vw 104px;
+  min-height: 580px;
+  color: var(--text-inverse);
+  overflow: hidden;
+  background:
+    radial-gradient(900px 520px at 78% 34%, rgba(254, 242, 0, 0.13), transparent 66%),
+    linear-gradient(135deg, var(--edl-maroon-deep) 0%, var(--edl-maroon) 55%, #7C0333 100%);
+}
+
+/* SUNBURST — rays radiating from the right, echoing the logo disc
+   without reproducing it. */
+.welcome-hero::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -14%;
+  width: 900px;
+  height: 900px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(254, 242, 0, 0.10) 0deg 7deg,
+    transparent 7deg 20deg
+  );
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 71%);
+          mask-image: radial-gradient(circle at 50% 50%, #000 34%, transparent 71%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* LATTICE — the pylon's cross-bracing, abstracted to a faint grid. */
+.welcome-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 25%, transparent 25%);
+  background-size: 42px 42px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.welcome-hero > * { position: relative; z-index: 2; }
+
+.welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 15px;
+  border: 1px solid rgba(254, 242, 0, 0.55);
+  background: rgba(254, 242, 0, 0.12);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+  color: var(--edl-yellow);
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--edl-yellow);
+}
+
+.welcome-hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(31px, 4.4vw, 47px);
+  line-height: 1.1;
+  font-weight: 690;
+  letter-spacing: -0.025em;
+  max-width: 15ch;
+}
+
+.welcome-hero h1 em { font-style: normal; color: var(--edl-yellow); }
+
+.welcome-hero .lede {
+  margin: 0 0 34px;
+  font-size: 17px;
+  line-height: 1.62;
+  color: rgba(255, 255, 255, 0.88);
+  max-width: 54ch;
+}
+
+.welcome-actions { display: flex; gap: 13px; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------ buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 28px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 660;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-primary {
+  background: var(--edl-yellow);
+  color: var(--edl-maroon-deep);
+  border-color: var(--edl-yellow-deep);
+}
+
+.btn-primary:hover { background: #FFF75C; }
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.btn-ghost:hover {
+  background: #FFFFFF;
+  color: var(--edl-maroon);
+  border-color: #FFFFFF;
+}
+
+.btn-sm { padding: 9px 18px; font-size: 14px; }
+
+/* -------------------------------------------------------------- stats */
+
+.welcome-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  align-content: center;
+}
+
+.welcome-stat {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 3px solid var(--edl-yellow);
+  border-radius: var(--radius);
+  padding: 21px;
+  transition: background 0.15s;
+}
+
+.welcome-stat:hover { background: rgba(255, 255, 255, 0.17); }
+
+.welcome-stat .num {
+  display: block;
+  font-size: 32px;
+  font-weight: 690;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--edl-yellow);
+}
+
+.welcome-stat .cap {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ----------------------------------------------------------- features */
+
+.welcome-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(236px, 1fr));
+  gap: 20px;
+  padding: 60px 6vw 68px;
+  align-items: stretch;
+}
+
+.welcome-feature {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--edl-maroon);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.welcome-feature:hover {
+  box-shadow: var(--shadow-md);
+  border-top-color: var(--edl-yellow-deep);
+}
+
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  font-size: 19px;
+  background: var(--edl-yellow-soft);
+  border: 1px solid var(--edl-yellow-deep);
+}
+
+.welcome-feature h3 {
+  margin: 0 0 7px;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--edl-maroon);
+}
+
+.welcome-feature p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.welcome-footer {
+  padding: 22px 6vw;
+  border-top: 3px solid var(--edl-yellow);
+  background: var(--edl-maroon-deep);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* =====================================================================
+   AUTH PAGES
+   ===================================================================== */
+
+.auth-shell { display: grid; grid-template-columns: 1fr 1fr; }
+
+.auth-aside {
+  position: relative;
+  padding: 56px clamp(32px, 4vw, 64px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: var(--text-inverse);
+  overflow: hidden;
+  background:
+    radial-gradient(620px 500px at 22% 22%, rgba(254, 242, 0, 0.11), transparent 64%),
+    linear-gradient(160deg, var(--edl-maroon-deep) 0%, var(--edl-maroon) 60%, #7C0333 100%);
+}
+
+/* Same sunburst cue, anchored to the top-left of the panel. */
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  top: -22%;
+  left: -26%;
+  width: 640px;
+  height: 640px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(254, 242, 0, 0.09) 0deg 7deg,
+    transparent 7deg 20deg
+  );
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 32%, transparent 70%);
+          mask-image: radial-gradient(circle at 50% 50%, #000 32%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-aside::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--edl-yellow);
+  z-index: 2;
+}
+
+.auth-aside > * { position: relative; z-index: 2; }
+
+.auth-aside h2 {
+  margin: 32px 0 14px;
+  font-size: clamp(25px, 2.6vw, 32px);
+  font-weight: 670;
+  line-height: 1.18;
+}
+
+.auth-aside p {
+  margin: 0 0 30px;
+  font-size: 15px;
+  line-height: 1.64;
+  color: rgba(255, 255, 255, 0.86);
+  max-width: 45ch;
+}
+
+.auth-aside ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-aside li {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.93);
+  padding-left: 28px;
+  position: relative;
+}
+
+.auth-aside li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--edl-yellow);
+}
+
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  background: var(--surface-sunken);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 424px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 38px 36px 32px;
+  box-shadow: var(--shadow-md);
+}
+
+.auth-card h1 {
+  margin: 0 0 6px;
+  font-size: 27px;
+  font-weight: 670;
+  letter-spacing: -0.015em;
+  color: var(--edl-maroon);
+}
+
+/* Yellow rule above the heading, echoing the logo disc. */
+.auth-card h1::before {
+  content: '';
+  display: block;
+  width: 46px;
+  height: 4px;
+  border-radius: 2px;
+  margin-bottom: 16px;
+  background: var(--edl-yellow);
+}
+
+.auth-card .sub {
+  margin: 0 0 26px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------- fields */
+
+.field { margin-bottom: 17px; }
+
+.field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 590;
+  color: #46303A;
+}
+
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.field input::placeholder { color: #A69299; }
+
+.field input:hover:not(:focus) { border-color: var(--border-strong); }
+
+.field input:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--edl-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.13);
+}
+
+.field input.invalid { border-color: var(--danger); background: var(--danger-bg); }
+
+.field .hint,
+.field .field-error {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.field .hint { color: var(--text-muted); }
+.field .field-error { color: var(--danger); font-weight: 550; }
+
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 66px; }
+
+.password-toggle {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--edl-maroon);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.password-toggle:hover { background: var(--info-bg); }
+
+.strength {
+  height: 5px;
+  border-radius: 3px;
+  background: #F0E7EB;
+  margin-top: 9px;
+  overflow: hidden;
+}
+
+.strength span { display: block; height: 100%; border-radius: 3px; }
+
+/* ------------------------------------------------------------- submit */
+
+.auth-submit {
+  width: 100%;
+  padding: 13px;
+  margin-top: 10px;
+  border: 1px solid var(--edl-maroon-deep);
+  border-radius: var(--radius-sm);
+  background: var(--edl-maroon);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 660;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.auth-submit:hover:not(:disabled) { background: var(--edl-maroon-deep); }
+.auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Static ring shown while a request runs. It does not spin. */
+.spin-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 9px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  vertical-align: -2px;
+}
+
+/* --------------------------------------------------------------- misc */
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  font-size: 13px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.auth-row input[type='checkbox'] { accent-color: var(--edl-maroon); }
+
+.auth-link {
+  color: var(--edl-maroon);
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: none;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.auth-link:hover { text-decoration: underline; }
+
+.auth-alt {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.alert {
+  padding: 12px 15px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  border: 1px solid transparent;
+  border-left-width: 4px;
+}
+
+.alert-error   { background: var(--danger-bg); border-color: #F0C3CB; border-left-color: var(--danger); color: #870B1F; }
+.alert-success { background: var(--ok-bg);     border-color: #BFDECB; border-left-color: var(--ok);     color: #175C39; }
+.alert-info    { background: var(--info-bg);   border-color: #EBCBD9; border-left-color: var(--info);   color: var(--edl-maroon); }
+
+.auth-back {
+  display: inline-block;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.auth-back:hover { color: var(--edl-maroon); }
+
+/* =====================================================================
+   TOASTS — appear and disappear without sliding.
+   ===================================================================== */
+
+.toast-viewport {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(380px, calc(100vw - 40px));
+  pointer-events: none;
+}
+
+.toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--info);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.toast.leaving { display: none; }
+
+.toast-success { border-left-color: var(--ok); }
+.toast-error   { border-left-color: var(--danger); }
+.toast-warning { border-left-color: var(--warn); }
+.toast-info    { border-left-color: var(--info); }
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-top: 1px;
+}
+
+.toast-success .toast-icon { background: var(--ok); }
+.toast-error   .toast-icon { background: var(--danger); }
+.toast-warning .toast-icon { background: var(--warn); }
+.toast-info    .toast-icon { background: var(--info); }
+
+.toast-body { flex: 1; min-width: 0; }
+
+.toast-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 640;
+  color: var(--text);
+}
+
+.toast-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  word-wrap: break-word;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.toast-close:hover { background: var(--surface-sunken); color: var(--text); }
+
+/* Accent bar along the bottom. It marks the toast type; it does not
+   count down, because that would be an animation. */
+.toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  opacity: 0.4;
+}
+
+.toast-success .toast-progress { background: var(--ok); }
+.toast-error   .toast-progress { background: var(--danger); }
+.toast-warning .toast-progress { background: var(--warn); }
+.toast-info    .toast-progress { background: var(--info); }
+
+/* =====================================================================
+   NARROW SCREENS
+   ===================================================================== */
+
+@media (max-width: 900px) {
+  .welcome-hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 104px 6vw 64px;
+  }
+  .welcome-hero::before { right: -46%; opacity: 0.6; }
+  .auth-shell { grid-template-columns: 1fr; }
+  .auth-aside { display: none; }
+  .auth-main { padding: 28px 18px; }
+  .auth-card { padding: 30px 24px 26px; }
+}
+
+@media (max-width: 520px) {
+  .welcome-stats { grid-template-columns: 1fr; }
+  .welcome-actions .btn { flex: 1 1 100%; }
+  .welcome-nav { padding: 16px 5vw; }
+  .brand-words span:last-child { display: none; }
+  .auth-card {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    padding: 16px 0;
+  }
+  .auth-main { background: var(--surface); }
+  .toast-viewport {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}

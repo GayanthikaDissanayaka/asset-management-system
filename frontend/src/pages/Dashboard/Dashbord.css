@@ -1,0 +1,1264 @@
+/* =====================================================================
+   Dashboard — CEB Uva Province, Network Asset Management
+   Filename kept as Dashbord.css to match the existing import.
+
+   Layout goal: the whole dashboard on one screen with no page scroll.
+   The page is a four-row grid pinned to the viewport height. Only the
+   depot table scrolls, inside its own card, because seventeen depots
+   cannot honestly be shown at once.
+
+   Colour: the EDL maroon and yellow drive the chrome. The series
+   colours the charts draw with live in Components/palette.js, where
+   they are documented and validated; they are deliberately NOT
+   redefined here, so there is one source of truth for them.
+   ===================================================================== */
+
+:root {
+  --dash-maroon:       #6B002C;
+  --dash-maroon-deep:  #2B0816;
+  --dash-maroon-lift:  #8A0A3C;
+  --dash-yellow:       #FEF200;
+  --dash-yellow-deep:  #E4D900;
+
+  --dash-ink:          #2B0A16;
+  --dash-ink-soft:     #6B5A62;
+  --dash-ink-muted:    #7E7178;
+
+  --dash-surface:      #FFFFFF;
+  --dash-line:         #EFE9EC;
+  --dash-line-strong:  #E2D8DD;
+
+  --dash-radius:       12px;
+  --dash-shadow:       0 1px 2px rgba(43, 10, 22, 0.05),
+                       0 6px 18px rgba(43, 10, 22, 0.04);
+}
+
+/* ------------------------------------------------------------- shell */
+
+.dashboard-page {
+  box-sizing: border-box;
+  height: 100vh;
+  overflow: hidden;
+
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 12px;
+
+  padding: 14px 18px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  color: var(--dash-ink);
+
+  background:
+    radial-gradient(1100px 420px at 10% -10%, rgba(107, 0, 44, 0.07), transparent 62%),
+    radial-gradient(880px 360px at 97% 2%, rgba(254, 242, 0, 0.13), transparent 58%),
+    #F8F5F7;
+}
+
+.dashboard-page * { box-sizing: border-box; }
+
+/* Refetch holds the previous render and dims it, rather than tearing the
+   layout down to a spinner. */
+.dashboard-page.is-refreshing .dashboard-charts,
+.dashboard-page.is-refreshing .summary-cards,
+.dashboard-page.is-refreshing .dashboard-table-card {
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+/* Loading and error states replace the grid with a simple centred box. */
+.dashboard-page-centred {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------ header */
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+
+  padding: 9px 14px;
+  border-radius: var(--dash-radius);
+  color: #FFFFFF;
+  background: linear-gradient(
+    118deg,
+    var(--dash-maroon-deep) 0%,
+    var(--dash-maroon) 56%,
+    var(--dash-maroon-lift) 100%
+  );
+  box-shadow: 0 4px 16px rgba(107, 0, 44, 0.22);
+}
+
+.dashboard-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dashboard-logo {
+  border-radius: 50%;
+  background: #FFFFFF;
+  padding: 2px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.dashboard-titles { min-width: 0; }
+
+.dashboard-titles h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.dashboard-titles p {
+  margin: 1px 0 0;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.76);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-inline-error {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--dash-maroon-deep);
+  background: var(--dash-yellow);
+}
+
+/* Quiet control on the dark header, so it does not compete with Refresh. */
+.dashboard-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.08);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: #FFFFFF;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dashboard-back:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.dashboard-back:focus-visible,
+.refresh-button:focus-visible {
+  outline: 2px solid var(--dash-yellow);
+  outline-offset: 2px;
+}
+
+/* The brand yellow carries the primary action, as on the welcome page. */
+.refresh-button {
+  background: var(--dash-yellow);
+  border: 1px solid var(--dash-yellow-deep);
+  border-radius: 8px;
+  padding: 7px 15px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--dash-maroon-deep);
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.refresh-button:hover:not(:disabled) { filter: brightness(1.06); }
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ------------------------------------------------------- stat tiles */
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.summary-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  padding: 11px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--dash-shadow);
+}
+
+/* A 3px rail rather than a heavy left border: the colour identifies the
+   tile without turning into a large saturated block. */
+.summary-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+}
+
+.summary-card.accent-1::before { background: #A31D52; }
+.summary-card.accent-2::before { background: #EDA100; }
+.summary-card.accent-3::before { background: #1BAF7A; }
+.summary-card.accent-4::before { background: #4A3AA7; }
+.summary-card.accent-5::before { background: #EB6834; }
+
+.summary-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--dash-ink-muted);
+}
+
+/* Proportional figures: tabular digits make a standalone number look
+   loose at display sizes. */
+.summary-value {
+  font-size: 25px;
+  font-weight: 650;
+  line-height: 1.12;
+  color: var(--dash-ink);
+}
+
+.summary-hint {
+  font-size: 10.5px;
+  color: var(--dash-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------- chart cards */
+
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0; /* lets Recharts shrink inside a grid cell */
+
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  padding: 12px 14px;
+  box-shadow: var(--dash-shadow);
+}
+
+.card-header {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  color: var(--dash-ink);
+}
+
+.card-header p {
+  margin: 1px 0 0;
+  font-size: 11px;
+  color: var(--dash-ink-muted);
+}
+
+/* Fills the card below the heading. min-height:0 is what lets the
+   Recharts container resolve height:100% inside a flex column. */
+.chart-wrapper {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.chart-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  color: var(--dash-ink-muted);
+  font-size: 12.5px;
+  text-align: center;
+  padding: 10px;
+  background: #FCFAFB;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+}
+
+/* ------------------------------------------------------------- donut */
+
+/* Ring beside the legend rather than above it. Stacked, the ring is
+   bound by the leftover height and collapses to a token; side by side it
+   is bound by the card's short edge and stays legible. */
+.donut-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.donut-plot {
+  position: relative;
+  flex: 0 0 42%;
+  height: 100%;
+  min-width: 0;
+}
+
+/* The share is printed as text beside every swatch. Two palette slots
+   sit below 3:1 on white, so the number must not depend on the colour. */
+.donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+}
+
+.donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.donut-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.donut-name {
+  color: var(--dash-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.donut-share {
+  margin-left: auto;
+  font-weight: 650;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------- depot table */
+
+.dashboard-table-card { min-height: 0; }
+
+.depot-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+}
+
+.depot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.depot-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #FAF5F7;
+  text-align: left;
+  padding: 8px 11px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-maroon);
+  border-bottom: 1px solid var(--dash-line-strong);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.depot-table thead th:hover { background: #F4EAEF; }
+
+.depot-table td {
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--dash-line);
+  vertical-align: middle;
+}
+
+.depot-table tbody tr:hover { background: #FCFAFB; }
+
+/* A depot with nothing recorded is a gap in the register, not noise, so
+   it stays in the table and reads as quieter rather than being hidden. */
+.depot-table tbody tr.is-empty td { color: var(--dash-ink-muted); }
+.depot-table tbody tr.is-empty .depot-name { color: var(--dash-ink-muted); }
+
+.depot-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.depot-table .strong { font-weight: 650; }
+
+.depot-name {
+  display: block;
+  font-weight: 550;
+  color: var(--dash-ink);
+}
+
+.depot-code {
+  display: block;
+  font-size: 10px;
+  color: var(--dash-ink-muted);
+}
+
+.share-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.share-bar {
+  width: 58px;
+  height: 5px;
+  background: #F1EAEE;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.share-fill {
+  height: 100%;
+  background: #A31D52;
+  border-radius: 3px;
+}
+
+.depot-table tfoot td {
+  padding: 8px 11px;
+  border-top: 1px solid var(--dash-line-strong);
+  font-weight: 650;
+  background: #FAF5F7;
+  position: sticky;
+  bottom: 0;
+}
+
+/* ------------------------------------------------- loading and error */
+
+.dashboard-loading,
+.dashboard-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #EADFE4;
+  border-top-color: var(--dash-maroon);
+  border-radius: 50%;
+  animation: dashboard-spin 0.8s linear infinite;
+}
+
+@keyframes dashboard-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dashboard-loading p {
+  margin: 0;
+  color: var(--dash-ink-soft);
+  font-size: 13px;
+}
+
+.dashboard-error h3 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--dash-ink);
+}
+
+.dashboard-error p {
+  margin: 0;
+  color: var(--dash-ink-soft);
+  max-width: 420px;
+  font-size: 13px;
+}
+
+.dashboard-error button {
+  background: var(--dash-maroon);
+  color: #FFFFFF;
+  border: 1px solid var(--dash-maroon);
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dashboard-error button:hover { background: var(--dash-maroon-lift); }
+
+.dashboard-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Two class selectors, so this beats the solid `.dashboard-error button`
+   fill above and the retry action stays the primary one. */
+.dashboard-error .dashboard-error-back {
+  background: #FFFFFF;
+  color: var(--dash-maroon);
+  border: 1px solid var(--dash-line-strong);
+}
+
+.dashboard-error .dashboard-error-back:hover {
+  background: #FAF5F7;
+  border-color: var(--dash-maroon);
+}
+
+/* --------------------------------------------- shared button shapes */
+
+.btn-primary {
+  background: var(--dash-maroon);
+  color: #FFFFFF;
+  border: 1px solid var(--dash-maroon);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--dash-maroon-lift); }
+.btn-primary:disabled { opacity: 0.55; cursor: default; }
+
+.btn-primary.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+.btn-quiet {
+  background: #FFFFFF;
+  color: var(--dash-ink-soft);
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  padding: 8px 15px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: #FAF5F7;
+  border-color: var(--dash-maroon);
+  color: var(--dash-maroon);
+}
+
+.btn-quiet:disabled { opacity: 0.55; cursor: default; }
+
+.dashboard-inline-notice {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--dash-maroon-deep);
+  background: #FFFFFF;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------- register toolbar */
+
+.register-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  margin-bottom: 9px;
+}
+
+/* Segmented control. One rail, the active view filled, so the five
+   readings of the same register look like one control rather than five
+   loose buttons. */
+.register-tabs {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: #F4EDF0;
+  border: 1px solid var(--dash-line);
+  border-radius: 9px;
+}
+
+.register-tab {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dash-ink-soft);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.register-tab:hover { color: var(--dash-maroon); }
+
+.register-tab.is-active {
+  background: var(--dash-maroon);
+  color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(107, 0, 44, 0.28);
+}
+
+.register-tab:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: 1px;
+}
+
+.register-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.register-summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dash-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.register-search {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  width: 200px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: var(--dash-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.register-search:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+/* Marks a segment added through this application rather than one of the
+   original spreadsheet loads, so a new entry is easy to spot. */
+.source-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #F0E4EA;
+  color: var(--dash-maroon);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.register-error {
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #7A1020;
+  background: #FDF2F4;
+  border: 1px solid #F2D3DA;
+}
+
+/* ------------------------------------------------------------ dialog */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(43, 8, 22, 0.46);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(88vh, 760px);
+  background: var(--dash-surface);
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(43, 10, 22, 0.32);
+  overflow: hidden;
+}
+
+.dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px 18px 13px;
+  color: #FFFFFF;
+  background: linear-gradient(
+    118deg,
+    var(--dash-maroon-deep) 0%,
+    var(--dash-maroon) 60%,
+    var(--dash-maroon-lift) 100%
+  );
+}
+
+.dialog-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.dialog-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dialog-close {
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dialog-close:hover { background: rgba(255, 255, 255, 0.24); }
+
+.dialog-steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--dash-line);
+  background: #FBF7F9;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+  flex-wrap: wrap;
+}
+
+.dialog-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dialog-steps li + li { margin-left: 12px; }
+
+.step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #E8DDE3;
+  color: var(--dash-ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dialog-steps .is-current { color: var(--dash-maroon); }
+.dialog-steps .is-current .step-dot {
+  background: var(--dash-maroon);
+  color: #FFFFFF;
+}
+
+.dialog-steps .is-done .step-dot {
+  background: var(--dash-yellow);
+  color: var(--dash-maroon-deep);
+}
+
+.dialog-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--dash-line);
+  background: #FBF7F9;
+  flex-shrink: 0;
+}
+
+.dialog-foot-right { display: flex; gap: 9px; }
+
+.dialog-error {
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #7A1020;
+  background: #FDF2F4;
+  border: 1px solid #F2D3DA;
+}
+
+/* ------------------------------------------------------------ fields */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field > span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-ink-muted);
+}
+
+.field select,
+.field input,
+.quantity-field input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--dash-ink);
+  padding: 7px 9px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: #FFFFFF;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field select:focus,
+.field input:focus,
+.quantity-field input:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+.field select:disabled { background: #F6F2F4; color: var(--dash-ink-muted); }
+
+.field .invalid { border-color: #B3271A; }
+
+.field-error {
+  font-size: 11px;
+  font-style: normal;
+  color: #B3271A;
+}
+
+.dialog-section { margin-top: 18px; }
+
+.dialog-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.dialog-section-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--dash-ink);
+}
+
+.dialog-section-note {
+  font-size: 11.5px;
+  color: var(--dash-ink-muted);
+}
+
+.quantity-group { margin-bottom: 13px; }
+
+.quantity-group h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-maroon);
+}
+
+/* auto-FILL, not auto-fit: a category holding a single asset type keeps a
+   normal-width box instead of stretching one input across the dialog. */
+.quantity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 9px;
+}
+
+.quantity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quantity-field > span {
+  font-size: 11.5px;
+  color: var(--dash-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quantity-field input { padding: 6px 8px; }
+
+/* Running total. Turns amber when the conductor lengths do not add up to
+   the route length, which is a flag rather than a block. */
+.dialog-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 11px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #F7F2F4;
+  border: 1px solid var(--dash-line);
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+}
+
+.dialog-tally strong {
+  font-size: 14px;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dialog-tally.is-warning {
+  background: #FFF9E0;
+  border-color: #E8D77A;
+}
+
+.dialog-tally-note { font-size: 11.5px; color: var(--dash-ink-muted); }
+
+/* --------------------------------------- CSCs a segment runs through */
+
+.csc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Select, length, remove. The remove button keeps a fixed track so the
+   selects stay aligned down the column. */
+.csc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 30px;
+  gap: 9px;
+  align-items: end;
+}
+
+.csc-row-length input { width: 100%; }
+
+.csc-row-remove {
+  height: 33px;
+  border: 1px solid var(--dash-line-strong);
+  background: #FFFFFF;
+  border-radius: 8px;
+  color: var(--dash-ink-muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.csc-row-remove:hover:not(:disabled) {
+  background: #FDF2F4;
+  border-color: #E2AFBD;
+  color: #B3271A;
+}
+
+.csc-row-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.csc-rows-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.csc-rows-total {
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+}
+
+.csc-rows-total strong {
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-quiet.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* Marks a segment running through more than one CSC. Hovering shows the
+   split. */
+.crossing-pill {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dash-yellow);
+  color: var(--dash-maroon-deep);
+  font-weight: 700;
+  font-size: 11px;
+  cursor: help;
+}
+
+/* ------------------------------------------------------------ import */
+
+.dialog-narrow { width: min(620px, 100%); }
+
+.import-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.import-hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--dash-ink-muted);
+  line-height: 1.5;
+}
+
+.import-file {
+  font: inherit;
+  font-size: 12.5px;
+  width: 100%;
+  padding: 9px;
+  border: 1px dashed var(--dash-line-strong);
+  border-radius: 9px;
+  background: #FBF7F9;
+  cursor: pointer;
+}
+
+.import-file::file-selector-button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 7px;
+  background: #FFFFFF;
+  color: var(--dash-maroon);
+  cursor: pointer;
+}
+
+.import-result {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: #FBF7F9;
+  border: 1px solid var(--dash-line);
+}
+
+.import-tallies {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.import-tally {
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+}
+
+.import-tally strong {
+  font-size: 17px;
+  color: var(--dash-ink);
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-tally.is-good strong { color: #1F7A4C; }
+.import-tally.is-bad strong  { color: #B3271A; }
+
+.import-result h4 {
+  margin: 13px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-ink-muted);
+}
+
+.import-list {
+  margin: 0;
+  padding-left: 17px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--dash-ink-soft);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.import-list.is-bad { color: #8A2A22; }
+
+.dialog-notice {
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--dash-ink-soft);
+  background: #FBF7F9;
+  border: 1px solid var(--dash-line);
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  color: #7A1020;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dialog-recap {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: #FBF7F9;
+  border: 1px solid var(--dash-line);
+  font-size: 12.5px;
+  color: var(--dash-ink-soft);
+}
+
+.dialog-recap strong { color: var(--dash-maroon); }
+
+/* ------------------------------------------------------- responsive */
+
+/* Three chart cards need real width. Below this the grid drops to two
+   columns and the page is allowed to scroll again, because forcing four
+   rows into a short viewport squeezes every chart into illegibility. */
+@media (max-width: 1180px), (max-height: 660px) {
+  .dashboard-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    grid-template-rows: none;
+    padding-bottom: 24px;
+  }
+
+  .dashboard-charts { grid-template-columns: repeat(2, 1fr); }
+
+  .chart-wrapper,
+  .donut-block { min-height: 240px; }
+
+  .depot-table-wrapper { max-height: 420px; }
+}
+
+@media (max-width: 1180px) {
+  .summary-cards { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 820px) {
+  .summary-cards { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-charts { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .dashboard-page { padding: 10px 12px 22px; }
+  .summary-cards { grid-template-columns: 1fr 1fr; }
+  .dashboard-identity { gap: 9px; }
+
+  /* Too narrow to sit the ring beside the legend. */
+  .donut-block { flex-direction: column; align-items: stretch; gap: 8px; }
+  .donut-plot { flex: 1; min-height: 150px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner { animation-duration: 2.4s; }
+  .dashboard-page.is-refreshing .dashboard-charts,
+  .dashboard-page.is-refreshing .summary-cards,
+  .dashboard-page.is-refreshing .dashboard-table-card {
+    transition: none;
+  }
+}
