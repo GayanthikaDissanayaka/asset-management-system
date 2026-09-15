@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -37,37 +36,73 @@ class SpreadsheetController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $validated = $request->validate([
-            'view' => ['nullable', 'string', 'in:areas,cscs,feeders,segments,assets,asset-by-csc'],
+            'view' => ['nullable', 'string', 'in:areas,cscs,feeders,segments,assets,asset-by-csc,asset-types,assets-used,assets-used-by-csc'],
         ]);
 
-        $sheets = [
+        $book = $this->buildExportBook($validated['view'] ?? null);
+
+        $name = 'uva-network-register-' . now()->format('Y-m-d') . '.xlsx';
+
+        return $this->download($book, $name);
+    }
+
+    /**
+     * The single sheets the export can produce, and where each reads
+     * from. Named once here so the download, the ?view= form and the
+     * saved-report endpoint all offer exactly the same list.
+     */
+    private function exportSheets(): array
+    {
+        return [
             'areas'        => ['Areas', fn () => $this->rowsFrom('v_line_length_by_area', 'total_km')],
             'cscs'         => ['CSCs', fn () => $this->rowsFrom('v_line_length_by_csc', 'total_km')],
             'feeders'      => ['Feeders', fn () => $this->rowsFrom('v_line_length_by_feeder', 'total_km')],
             'segments'     => ['Segments', fn () => $this->segmentRows()],
             'assets'       => ['Assets', fn () => $this->rowsFrom('v_asset_totals', 'total_quantity')],
             'asset-by-csc' => ['Assets by CSC', fn () => $this->rowsFrom('v_asset_by_csc', 'total_quantity')],
-        ];
 
-        if (! empty($validated['view'])) {
-            $sheets = [$validated['view'] => $sheets[$validated['view']]];
+            // The full catalogue from asset_categories and asset_types,
+            // so types holding nothing are in the file too.
+            'asset-types'  => ['Asset types', fn () => $this->assetTypeRows()],
+
+            /* The usage log. This is history, not current state: what was
+               entered, where it went, when, and by whom. `assets` can
+               only say what a place has now, because a corrected
+               quantity overwrites the one it corrected. */
+            'assets-used'        => ['Assets used', fn () => $this->usedRows()],
+            'assets-used-by-csc' => ['Used by CSC', fn () => $this->rowsFrom('v_assets_used_by_csc', 'total_quantity')],
+        ];
+    }
+
+    /**
+     * The export workbook, built once and used by both the download and
+     * the save-to-reports-folder endpoint.
+     *
+     * Shared deliberately: a saved report that differed from the one the
+     * browser downloaded would be the worst kind of bug, because both
+     * look right on their own and only disagree when somebody compares
+     * them months later.
+     */
+    private function buildExportBook(?string $view = null): Spreadsheet
+    {
+        $sheets = $this->exportSheets();
+
+        if (! empty($view)) {
+            $sheets = [$view => $sheets[$view]];
         }
 
         $book = new Spreadsheet();
         $book->removeSheetByIndex(0);
 
         foreach ($sheets as [$title, $loader]) {
-            $rows = $loader();
             $sheet = $book->createSheet();
             $sheet->setTitle($title);
-            $this->writeTable($sheet, $rows);
+            $this->writeTable($sheet, $loader());
         }
 
         $book->setActiveSheetIndex(0);
 
-        $name = 'uva-network-register-' . now()->format('Y-m-d') . '.xlsx';
-
-        return $this->download($book, $name);
+        return $book;
     }
 
     /**
@@ -84,6 +119,15 @@ class SpreadsheetController extends Controller
      */
     public function report(): StreamedResponse
     {
+        return $this->download(
+            $this->buildReportBook(),
+            'uva-network-asset-report-' . now()->format('Y-m-d') . '.xlsx'
+        );
+    }
+
+    /** The written report workbook. Shared by download and save. */
+    private function buildReportBook(): Spreadsheet
+    {
         $book = new Spreadsheet();
         $book->removeSheetByIndex(0);
 
@@ -95,11 +139,18 @@ class SpreadsheetController extends Controller
 
         // The underlying tables, after the narrative.
         foreach ([
-            'Data · Areas'    => fn () => $this->rowsFrom('v_line_length_by_area', 'total_km'),
-            'Data · CSCs'     => fn () => $this->rowsFrom('v_line_length_by_csc', 'total_km'),
-            'Data · Feeders'  => fn () => $this->rowsFrom('v_line_length_by_feeder', 'total_km'),
-            'Data · Segments' => fn () => $this->segmentRows(),
-            'Data · Assets'   => fn () => $this->rowsFrom('v_asset_totals', 'total_quantity'),
+            'Data · Areas'       => fn () => $this->rowsFrom('v_line_length_by_area', 'total_km'),
+            'Data · CSCs'        => fn () => $this->rowsFrom('v_line_length_by_csc', 'total_km'),
+            'Data · Feeders'     => fn () => $this->rowsFrom('v_line_length_by_feeder', 'total_km'),
+            'Data · Segments'    => fn () => $this->segmentRows(),
+            'Data · Assets'      => fn () => $this->rowsFrom('v_asset_totals', 'total_quantity'),
+            'Data · Asset types' => fn () => $this->assetTypeRows(),
+
+            /* The usage log, as its own sheets. It answers a question
+               none of the sheets above can: not what is held now, but
+               what was entered, when, and by whom. */
+            'Data · Assets used'  => fn () => $this->usedRows(),
+            'Data · Used by CSC'  => fn () => $this->rowsFrom('v_assets_used_by_csc', 'total_quantity'),
         ] as $title => $loader) {
             $sheet = $book->createSheet();
             $sheet->setTitle($title);
@@ -108,10 +159,7 @@ class SpreadsheetController extends Controller
 
         $book->setActiveSheetIndex(0);
 
-        return $this->download(
-            $book,
-            'uva-network-asset-report-' . now()->format('Y-m-d') . '.xlsx'
-        );
+        return $book;
     }
 
     /**
@@ -128,20 +176,23 @@ class SpreadsheetController extends Controller
         $sheet->setTitle('Segments');
 
         $headers = array_merge(
-            ['segment_code', 'csc_code', 'length_km', 'feeder_code', 'voltage_level', 'remarks'],
+            ['segment_code', 'csc_code', 'area', 'length_km', 'feeder_code', 'voltage_level', 'remarks'],
             $this->assetColumnHeaders()
         );
 
         $sheet->fromArray($headers, null, 'A1');
 
-        // One worked example, including a segment split over two CSCs.
+        /* Worked examples: a segment split over two CSCs, and a row
+           naming its CSC the way people actually write it, to show that
+           the code is not required. */
         $sheet->fromArray([
-            ['BDSM900', 'BDL-CSC01', 6.400, '', '33kV', 'example — delete this row'],
-            ['BDSM900', 'MAH-CSC02', 3.850, '', '33kV', 'same segment, the part inside the next CSC'],
+            ['BDSM900', 'BDL-CSC01', 'Badulla', 6.400, '', '33kV', 'example — delete this row'],
+            ['BDSM900', 'MAH-CSC02', '', 3.850, '', '33kV', 'same segment, the part inside the next CSC'],
+            ['BDSM901', 'Hali Ela', '', 2.100, '', '33kV', 'a name works too — so does a known alias'],
         ], null, 'A2');
 
         $this->styleHeader($sheet, count($headers));
-        $sheet->freezePane('D2');
+        $sheet->freezePane('E2');
 
         /* CSV holds one sheet, so the notes and code list are dropped and
            only the fillable grid is returned. Worth offering, because a
@@ -169,21 +220,52 @@ class SpreadsheetController extends Controller
             ['column heading. Leave blank where there are none. When a segment'],
             ['spans several rows the asset columns are added together.'],
             [''],
-            ['segment_code and csc_code are required. Everything else is'],
+            ['segment_code and the CSC are required. Everything else is'],
             ['optional. A segment_code already present for that CSC is'],
             ['skipped and reported, never overwritten.'],
+            [''],
+            ['NAMING THE PLACE'],
+            [''],
+            ['The CSC column takes the code (BDL-CSC01), the name (Badulla)'],
+            ['or a known alias (Hali Ela, Bibile, Mahiyangana). Case, spaces'],
+            ['and hyphens do not matter. The column may be headed csc_code,'],
+            ['csc or depot.'],
+            [''],
+            ['The area column is optional and only used to tell two places'],
+            ['apart if a name could mean either. If the area you give does'],
+            ['not contain the CSC you named, the row is refused rather than'],
+            ['filed under a guess -- a row put in the wrong place is worse'],
+            ['than one that failed to load, because nobody goes looking.'],
+            [''],
+            ['An area on its own is not enough. An area has several CSCs and'],
+            ['choosing one to stand for the rest would invent data.'],
+            [''],
+            ['After loading, the result lists every place name in the sheet'],
+            ['and the CSC it was filed under. Check that list.'],
         ], null, 'A1');
         $notes->getColumnDimension('A')->setWidth(70);
         $notes->getStyle('A1')->getFont()->setBold(true);
 
         $refs = $book->createSheet();
         $refs->setTitle('Codes');
-        $refRows = [['CSC code', 'CSC name', 'Area', 'Feeder codes for this CSC']];
+
+        /* The aliases are listed because they are accepted on import,
+           and a spelling that works is no use to anybody who cannot see
+           that it works. */
+        $refRows = [[
+            'CSC code', 'CSC name', 'Area',
+            'Also accepted as', 'Feeder codes for this CSC',
+        ]];
 
         $feedersByCsc = DB::table('feeders')
             ->select('origin_csc_id', 'feeder_code')
             ->get()
             ->groupBy('origin_csc_id');
+
+        $aliasesByCsc = DB::table('csc_aliases')
+            ->select('csc_id', 'alias_name')
+            ->get()
+            ->groupBy('csc_id');
 
         foreach (
             DB::table('csc_depots as d')
@@ -195,259 +277,20 @@ class SpreadsheetController extends Controller
                 $csc->csc_code,
                 $csc->csc_name,
                 $csc->area_name,
+                $aliasesByCsc->get($csc->csc_id, collect())->pluck('alias_name')->implode(', '),
                 $feedersByCsc->get($csc->csc_id, collect())->pluck('feeder_code')->implode(', '),
             ];
         }
 
         $refs->fromArray($refRows, null, 'A1');
-        $this->styleHeader($refs, 4);
-        foreach (range('A', 'D') as $col) {
+        $this->styleHeader($refs, 5);
+        foreach (range('A', 'E') as $col) {
             $refs->getColumnDimension($col)->setAutoSize(true);
         }
 
         $book->setActiveSheetIndex(0);
 
         return $this->download($book, 'uva-segment-import-template.xlsx');
-    }
-
-    /* ============================== IMPORT ============================ */
-
-    /**
-     * Loads a workbook of segments.
-     *
-     * Rows sharing a segment_code are one segment with several CSC
-     * portions. Everything is validated and grouped before anything is
-     * written, and the whole load runs in one transaction, so a workbook
-     * with a bad row halfway down does not leave half a register behind.
-     */
-    public function import(Request $request)
-    {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:10240'],
-        ]);
-
-        $upload    = $request->file('file');
-        $extension = strtolower($upload->getClientOriginalExtension());
-
-        /*
-         * Reading .xlsx means unzipping it, and PHP's zip extension is
-         * optional. Writing does not need it, so export works either way;
-         * without it, import has to say so plainly rather than dying in
-         * PhpSpreadsheet with "Class ZipArchive not found".
-         */
-        if (in_array($extension, ['xlsx', 'xls'], true) && ! class_exists(\ZipArchive::class)) {
-            return response()->json([
-                'message' => 'This server cannot read .xlsx files because PHP\'s zip extension is switched off. '
-                    . 'Save the sheet as CSV and upload that, or enable it by removing the semicolon from '
-                    . '";extension=zip" in php.ini and restarting Apache.',
-                'code'    => 'ZIP_EXTENSION_MISSING',
-            ], 422);
-        }
-
-        try {
-            // Chosen by extension rather than sniffed, so a CSV is never
-            // mistaken for something that needs unzipping.
-            $reader = match ($extension) {
-                'csv', 'txt' => IOFactory::createReader('Csv'),
-                'xls'        => IOFactory::createReader('Xls'),
-                default      => IOFactory::createReader('Xlsx'),
-            };
-            $reader->setReadDataOnly(true);
-
-            $sheet = $reader->load($upload->getRealPath())->getSheet(0);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'That file could not be read as a spreadsheet: ' . $e->getMessage(),
-            ], 422);
-        }
-
-        $rows = $sheet->toArray(null, true, false, false);
-
-        if (count($rows) < 2) {
-            return response()->json([
-                'message' => 'The first sheet has no data rows below its headings.',
-            ], 422);
-        }
-
-        $headers = array_map(
-            fn ($h) => $this->normaliseHeader((string) $h),
-            array_shift($rows)
-        );
-
-        $required = ['segment_code', 'csc_code'];
-        foreach ($required as $needed) {
-            if (! in_array($needed, $headers, true)) {
-                return response()->json([
-                    'message' => "The sheet is missing a '{$needed}' column. Download the template to see the expected headings.",
-                ], 422);
-            }
-        }
-
-        $cscByCode    = DB::table('csc_depots')->pluck('csc_id', 'csc_code');
-        $feederByCode = DB::table('feeders')->pluck('feeder_id', 'feeder_code');
-        $typeByName   = $this->assetTypesByNormalisedName();
-        $voltages     = ['33kV', '11kV', '400V'];
-
-        $groups = [];
-        $errors = [];
-
-        foreach ($rows as $index => $raw) {
-            $lineNo = $index + 2; // header is row 1
-            $row = $this->rowToMap($headers, $raw);
-
-            $code = trim((string) ($row['segment_code'] ?? ''));
-            $csc  = trim((string) ($row['csc_code'] ?? ''));
-
-            if ($code === '' && $csc === '') {
-                continue; // blank spacer row
-            }
-
-            if ($code === '') {
-                $errors[] = ['row' => $lineNo, 'message' => 'segment_code is empty.'];
-                continue;
-            }
-            if (! isset($cscByCode[$csc])) {
-                $errors[] = ['row' => $lineNo, 'message' => "Unknown csc_code '{$csc}'."];
-                continue;
-            }
-
-            $voltage = trim((string) ($row['voltage_level'] ?? ''));
-            if ($voltage !== '' && ! in_array($voltage, $voltages, true)) {
-                $errors[] = ['row' => $lineNo, 'message' => "voltage_level '{$voltage}' is not one of 33kV, 11kV, 400V."];
-                continue;
-            }
-
-            $feederCode = trim((string) ($row['feeder_code'] ?? ''));
-            if ($feederCode !== '' && ! isset($feederByCode[$feederCode])) {
-                $errors[] = ['row' => $lineNo, 'message' => "Unknown feeder_code '{$feederCode}'."];
-                continue;
-            }
-
-            $groups[$code] ??= [
-                'code'      => $code,
-                'portions'  => [],
-                'items'     => [],
-                'feeder_id' => null,
-                'voltage'   => '33kV',
-                'remarks'   => null,
-                'first_row' => $lineNo,
-            ];
-            $g = &$groups[$code];
-
-            $cscId = (int) $cscByCode[$csc];
-            $g['portions'][$cscId] = ($g['portions'][$cscId] ?? 0)
-                + (float) $this->numeric($row['length_km'] ?? null);
-
-            if ($feederCode !== '' && $g['feeder_id'] === null) {
-                $g['feeder_id'] = (int) $feederByCode[$feederCode];
-            }
-            if ($voltage !== '') {
-                $g['voltage'] = $voltage;
-            }
-            $remark = trim((string) ($row['remarks'] ?? ''));
-            if ($remark !== '' && $g['remarks'] === null) {
-                $g['remarks'] = mb_substr($remark, 0, 2000);
-            }
-
-            // Asset columns are summed across the segment's rows, so it
-            // does not matter which row of a split they were typed on.
-            foreach ($typeByName as $normalised => $type) {
-                $value = $this->numeric($row[$normalised] ?? null);
-                if ($value > 0) {
-                    $g['items'][$type->asset_type_id] =
-                        ($g['items'][$type->asset_type_id] ?? 0) + $value;
-                }
-            }
-
-            unset($g);
-        }
-
-        if (empty($groups)) {
-            return response()->json([
-                'message' => 'No usable rows were found.',
-                'created' => 0,
-                'skipped' => 0,
-                'errors'  => $errors,
-            ], 422);
-        }
-
-        $created = 0;
-        $skipped = [];
-
-        DB::transaction(function () use ($groups, &$created, &$skipped) {
-            $units = DB::table('asset_types')->pluck('unit_of_measure', 'asset_type_id');
-
-            foreach ($groups as $g) {
-                // Largest portion owns the register row, matching what the
-                // dashboard form does.
-                arsort($g['portions']);
-                $primaryCscId = (int) array_key_first($g['portions']);
-                $totalKm      = round(array_sum($g['portions']), 4);
-                $isSplit      = count($g['portions']) > 1;
-
-                $clash = DB::table('segment_register')
-                    ->where('csc_id', $primaryCscId)
-                    ->where('segment_code', $g['code'])
-                    ->exists();
-
-                if ($clash) {
-                    $skipped[] = [
-                        'row'     => $g['first_row'],
-                        'code'    => $g['code'],
-                        'message' => 'Already in the register for this CSC.',
-                    ];
-                    continue;
-                }
-
-                $registerId = DB::table('segment_register')->insertGetId([
-                    'csc_id'        => $primaryCscId,
-                    'feeder_id'     => $g['feeder_id'],
-                    'segment_id'    => null,
-                    'segment_code'  => $g['code'],
-                    'length_km'     => $totalKm,
-                    'voltage_level' => $g['voltage'],
-                    'status'        => 'ACTIVE',
-                    'remarks'       => $g['remarks'],
-                    'source_file'   => 'excel-import',
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
-                ]);
-
-                if ($isSplit) {
-                    foreach ($g['portions'] as $cscId => $km) {
-                        DB::table('segment_csc')->insert([
-                            'register_id' => $registerId,
-                            'csc_id'      => $cscId,
-                            'length_km'   => round($km, 4),
-                            'created_at'  => now(),
-                            'updated_at'  => now(),
-                        ]);
-                    }
-                }
-
-                foreach ($g['items'] as $typeId => $qty) {
-                    DB::table('segment_asset')->insert([
-                        'register_id'     => $registerId,
-                        'asset_type_id'   => $typeId,
-                        'quantity'        => round($qty, 4),
-                        'unit_of_measure' => $units[$typeId] ?? 'nos',
-                        'created_at'      => now(),
-                        'updated_at'      => now(),
-                    ]);
-                }
-
-                $created++;
-            }
-        });
-
-        return response()->json([
-            'message' => $created > 0
-                ? "Loaded {$created} segments."
-                : 'Nothing was loaded.',
-            'created' => $created,
-            'skipped' => $skipped,
-            'errors'  => $errors,
-        ], $created > 0 ? 201 : 422);
     }
 
     /* ============================= HELPERS ============================ */
@@ -769,47 +612,206 @@ class SpreadsheetController extends Controller
             ->all();
     }
 
-    private function assetTypesByNormalisedName()
+    /**
+     * The first of several acceptable headings that the sheet actually
+     * has, or null.
+     *
+     * Sheets in the wild head the same column "CSC", "Depot" or
+     * "csc_code", and insisting on one spelling is how an importer ends
+     * up rejecting the files it was written to load.
+     */
+    /* ========================= SAVED REPORTS ========================== */
+
+    /**
+     * Where generated reports are kept on disk.
+     *
+     * A folder inside the project rather than storage/app, so it shows up
+     * in the editor's file tree beside everything else and can be opened,
+     * mailed or committed without going hunting for it.
+     */
+    private function reportsPath(string $file = ''): string
     {
-        return DB::table('asset_types')
-            ->select('asset_type_id', 'type_name', 'unit_of_measure')
-            ->get()
-            ->keyBy(fn ($t) => $this->normaliseHeader($t->type_name));
+        $dir = realpath(base_path('..')) . DIRECTORY_SEPARATOR . 'reports';
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        return $file === '' ? $dir : $dir . DIRECTORY_SEPARATOR . $file;
     }
 
     /**
-     * Headings are matched loosely: case, spaces, punctuation and a
-     * trailing unit in brackets are all ignored, so "Copper Conductor
-     * (km)", "copper_conductor" and "Copper Conductor" are one column.
+     * Builds a report and keeps a copy in the project's reports/ folder.
+     *
+     * The download endpoints stream a file to the browser and keep
+     * nothing. That is fine for "let me look at this now", and useless
+     * for "what did the register say at the end of last month" -- the
+     * answer to that has to have been written down at the time, because
+     * the register has moved on since.
+     *
+     * So this writes the file, and `savedReports` lists what has been
+     * written. The filename carries the date and time for the same
+     * reason: two reports built the same day are different documents.
      */
-    private function normaliseHeader(string $header): string
+    public function saveReport(Request $request)
     {
-        $h = preg_replace('/\s*\([^)]*\)\s*$/', '', trim($header));
-        $h = strtolower($h);
-        $h = preg_replace('/[^a-z0-9]+/', '_', $h);
-        return trim($h, '_');
+        $validated = $request->validate([
+            'view'  => ['nullable', 'string', 'in:report,areas,cscs,feeders,segments,assets,asset-by-csc,asset-types,assets-used,assets-used-by-csc'],
+            'label' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        $view = $validated['view'] ?? 'report';
+
+        // Rebuilt through the same code paths the downloads use, so a
+        // saved file and a downloaded one can never differ.
+        $book = $view === 'report'
+            ? $this->buildReportBook()
+            : $this->buildExportBook($view);
+
+        $label = trim($validated['label'] ?? '');
+        $slug  = $label !== ''
+            ? '-' . strtolower(preg_replace('/[^A-Za-z0-9]+/', '-', $label))
+            : '';
+
+        $name = sprintf(
+            'uva-%s-%s%s.xlsx',
+            $view,
+            now()->format('Y-m-d-His'),
+            trim($slug, '-') === '' ? '' : $slug
+        );
+
+        $path = $this->reportsPath($name);
+
+        (new Xlsx($book))->save($path);
+
+        return response()->json([
+            'message'  => "Saved to reports/{$name}",
+            'file'     => $name,
+            'bytes'    => filesize($path),
+            'saved_at' => now()->toDateTimeString(),
+
+            // The full path, because the point of saving into the
+            // project is being able to go and open it.
+            'path'     => $path,
+        ], 201);
     }
 
-    private function rowToMap(array $headers, array $raw): array
+    /** Everything written to reports/, newest first. */
+    public function savedReports()
     {
-        $map = [];
-        foreach ($headers as $i => $key) {
-            if ($key === '') {
-                continue;
-            }
-            $map[$key] = $raw[$i] ?? null;
-        }
-        return $map;
+        $dir = $this->reportsPath();
+
+        $files = collect(glob($dir . DIRECTORY_SEPARATOR . '*.xlsx') ?: [])
+            ->map(fn ($p) => [
+                'file'     => basename($p),
+                'bytes'    => filesize($p),
+                'saved_at' => date('Y-m-d H:i:s', filemtime($p)),
+                'stamp'    => filemtime($p),
+            ])
+            ->sortByDesc('stamp')
+            ->values()
+            ->map(fn ($f) => collect($f)->except('stamp')->all());
+
+        return response()->json([
+            'folder' => $dir,
+            'count'  => $files->count(),
+            'files'  => $files,
+        ]);
     }
 
-    private function numeric($value): float
+    /**
+     * Downloads one previously saved report.
+     *
+     * The name is matched against the directory listing rather than
+     * joined onto a path: a filename arriving from the browser must
+     * never be able to walk out of reports/ and read something else.
+     */
+    public function downloadSaved(Request $request)
     {
-        if ($value === null || $value === '') {
-            return 0.0;
+        $validated = $request->validate([
+            'file' => ['required', 'string', 'max:200'],
+        ]);
+
+        $dir   = $this->reportsPath();
+        $known = collect(glob($dir . DIRECTORY_SEPARATOR . '*.xlsx') ?: [])
+            ->keyBy(fn ($p) => basename($p));
+
+        $path = $known[$validated['file']] ?? null;
+
+        if (! $path) {
+            return response()->json([
+                'message' => 'That report is not in the reports folder.',
+            ], 404);
         }
-        $clean = preg_replace('/[^0-9.\-]/', '', (string) $value);
-        return is_numeric($clean) ? (float) $clean : 0.0;
+
+        return response()->download($path);
     }
+
+    /**
+     * The usage log in readable order: newest first, because the reason
+     * to open it is usually "what went out recently".
+     */
+    private function usedRows(): array
+    {
+        return DB::table('v_assets_used')
+            ->select([
+                'recorded_at', 'used_on', 'category_name', 'type_name',
+                'quantity', 'unit_of_measure', 'condition_status',
+                'csc_code', 'csc_name', 'area_name', 'province_name',
+                'used_for', 'recorded_by_name', 'batch_ref',
+            ])
+            ->orderByDesc('recorded_at')
+            ->orderByDesc('used_id')
+            ->get()
+            ->map(fn ($r) => (array) $r)
+            ->all();
+    }
+
+    /**
+     * Every type the catalogue defines, with what is held against it.
+     *
+     * Driven from asset_categories and asset_types rather than from the
+     * holdings, so a type with nothing recorded still appears -- that a
+     * type has no records is itself worth seeing in a report.
+     */
+    private function assetTypeRows(): array
+    {
+        $held = DB::table('v_asset_register')
+            ->select('asset_type_id')
+            ->selectRaw('COUNT(*) AS records')
+            ->selectRaw('SUM(quantity) AS quantity')
+            ->selectRaw('COUNT(DISTINCT csc_id) AS csc_count')
+            ->groupBy('asset_type_id')
+            ->get()
+            ->keyBy('asset_type_id');
+
+        return DB::table('asset_types as t')
+            ->join('asset_categories as c', 'c.category_id', '=', 't.category_id')
+            ->select([
+                'c.category_name', 't.type_code', 't.type_name',
+                't.unit_of_measure', 't.is_active',
+            ])
+            ->addSelect('t.asset_type_id')
+            ->orderBy('c.display_order')
+            ->orderBy('t.display_order')
+            ->get()
+            ->map(function ($t) use ($held) {
+                $h = $held[$t->asset_type_id] ?? null;
+
+                return [
+                    'category_name'   => $t->category_name,
+                    'type_code'       => $t->type_code,
+                    'type_name'       => $t->type_name,
+                    'unit_of_measure' => $t->unit_of_measure,
+                    'quantity_held'   => (float) ($h->quantity ?? 0),
+                    'records'         => (int) ($h->records ?? 0),
+                    'csc_count'       => (int) ($h->csc_count ?? 0),
+                    'is_active'       => $t->is_active ? 'yes' : 'no',
+                ];
+            })
+            ->all();
+    }
+
 
     private function writeTable($sheet, array $rows): void
     {

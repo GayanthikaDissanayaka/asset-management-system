@@ -13,13 +13,18 @@ class User extends Authenticatable
 
     protected $fillable = [
         'role_id',
+        'requested_role_id',
         'area_id',
         'csc_id',
         'username',
+        'employee_no',
         'password_hash',
         'full_name',
         'designation',
         'email',
+        'phone',
+        'registration_source',
+        'scope_assigned',
         'is_active',
     ];
 
@@ -48,5 +53,11 @@ class User extends Authenticatable
     public function area()
     {
         return $this->belongsTo(Area::class, 'area_id');
+    }
+
+    /** What the applicant asked for at sign-up, not what they hold. */
+    public function requestedRole()
+    {
+        return $this->belongsTo(Role::class, 'requested_role_id');
     }
 }

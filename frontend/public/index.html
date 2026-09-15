@@ -2,7 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CEB Uva Province — Network Asset System</title>
+
+    <!--
+      NOT FOR SEARCH ENGINES.
+
+      This is an internal system holding the province's transformer,
+      switchgear and line register. It is not a public site and must
+      never appear in a search result.
+
+      robots.txt asks crawlers not to fetch these pages; this tag tells
+      one that fetched anyway not to index or follow. Both are hints
+      that well-behaved crawlers honour — the real protection is that
+      every page but sign-in requires a token, and every API read is
+      behind auth:sanctum.
+
+      The in-app search bar is unrelated to any of this: it queries
+      v_search_index over the signed-in user's own data. Nothing it
+      returns is or becomes public.
+    -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="referrer" content="same-origin" />
+
+    <meta name="description" content="Internal network asset management for CEB Uva Province. Authorised staff only." />
   </head>
   <body>
     <div id="root"></div>

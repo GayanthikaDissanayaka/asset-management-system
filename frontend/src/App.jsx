@@ -11,6 +11,9 @@ import {
 } from './pages/Auth/auth';
 
 import Dashboard from './pages/Dashboard/Dashboard';
+import HvLength from './pages/HvLength/HvLength';
+import AssetsPage from './pages/Assets/AssetsPage';
+import ReportsPage from './pages/Reports/ReportsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Styles for the status pages below. Auth.jsx imports this too; importing
@@ -104,6 +107,33 @@ const App = () => (
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hv-length"
+        element={
+          <ProtectedRoute>
+            <HvLength />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/assets"
+        element={
+          <ProtectedRoute>
+            <AssetsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute>
+            <ReportsPage />
           </ProtectedRoute>
         }
       />

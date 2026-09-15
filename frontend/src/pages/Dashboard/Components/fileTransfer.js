@@ -29,9 +29,11 @@ export async function downloadFromApi(path, fallbackName) {
 }
 
 /** Uploads one spreadsheet to the segment importer. */
-export async function uploadSpreadsheet(file) {
+export async function uploadSpreadsheet(file, { confirm = false } = {}) {
   const body = new FormData();
   body.append('file', file);
+  // A transformer workbook is previewed first; confirm applies it.
+  if (confirm) body.append('confirm', '1');
 
   const { data } = await axiosClient.post('/network/import', body, {
     headers: { 'Content-Type': 'multipart/form-data' },

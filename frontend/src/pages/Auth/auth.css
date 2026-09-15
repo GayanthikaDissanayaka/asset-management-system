@@ -643,6 +643,132 @@
   color: var(--text-muted);
 }
 
+/* =====================================================================
+   GROUPED FORM SECTIONS
+
+   The account request asks for four different kinds of thing — who you
+   are, how to reach you, where you work, and a password. Grouped under
+   headings it reads as four short questions instead of one long column
+   of eleven boxes.
+   ===================================================================== */
+
+/* Wider than a sign-in card, because these sections pair fields. */
+.auth-card-wide { max-width: 560px; }
+
+/* ---------------------------------------------------------------------
+   COMPACT VARIANT
+
+   The account request has nine fields. At the normal card's spacing it
+   ran past the fold on a 768px laptop, and a sign-up form that has to be
+   scrolled hides its own submit button. Every measurement below is
+   tightened just enough to bring the whole thing onto one screen, with
+   the fields paired two to a row.
+   --------------------------------------------------------------------- */
+
+.auth-card-compact { padding: 26px 30px 22px; }
+
+.auth-card-compact .auth-back { margin-bottom: 10px; }
+
+.auth-card-compact h1 {
+  font-size: 25px;
+  margin-bottom: 4px;
+}
+
+.auth-card-compact h1::before { margin-bottom: 9px; }
+
+.auth-card-compact .sub { margin-bottom: 14px; font-size: 13.5px; }
+
+.auth-card-compact .form-section { padding-top: 11px; margin-bottom: 0; }
+
+.auth-card-compact .form-section legend { font-size: 11px; }
+
+.auth-card-compact .field { margin-bottom: 11px; }
+
+.auth-card-compact .field label { margin-bottom: 4px; font-size: 12.5px; }
+
+.auth-card-compact .field input,
+.auth-card-compact .field select { padding: 9px 12px; font-size: 14px; }
+
+.auth-card-compact .field .hint,
+.auth-card-compact .field .field-error { margin-top: 3px; font-size: 11.5px; }
+
+.auth-card-compact .auth-submit { margin-top: 6px; }
+
+.auth-card-compact .auth-alt { margin-top: 12px; }
+
+/* The aside is decoration; on a short screen the form is what matters. */
+@media (max-height: 760px) {
+  .auth-main { padding: 18px 24px; }
+  .auth-card-compact { padding: 20px 26px 18px; }
+  .auth-card-compact h1 { font-size: 22px; }
+  .auth-card-compact .field { margin-bottom: 9px; }
+}
+
+.form-section {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0 0 6px;
+  padding: 16px 0 0;
+  min-width: 0;
+}
+
+.form-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.form-section legend {
+  padding: 0 8px 0 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--edl-maroon);
+}
+
+/* Two fields side by side, stacking when there is no room for both. */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+@media (max-width: 560px) {
+  .field-row { grid-template-columns: 1fr; }
+}
+
+/* Selects were not part of the original auth forms; matched to the
+   inputs beside them rather than left as browser defaults. */
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.field select:hover:not(:focus):not(:disabled) { border-color: var(--border-strong); }
+
+.field select:focus {
+  outline: none;
+  border-color: var(--edl-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+.field select:disabled {
+  cursor: default;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.field select.invalid { border-color: var(--danger); background: var(--danger-bg); }
+
 .alert {
   padding: 12px 15px;
   border-radius: var(--radius-sm);

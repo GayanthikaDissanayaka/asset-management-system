@@ -293,7 +293,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
       >
         <header className="dialog-head">
           <div>
-            <h2 id="add-segment-title">Add a segment</h2>
+            <h2 id="add-segment-title">Add HV length</h2>
             <p>
               {step === 1
                 ? 'Where the segment runs, and the conductor it is built from.'
@@ -515,7 +515,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
                 <div className="csc-rows-foot">
                   <button
                     type="button"
-                    className="btn-quiet btn-sm"
+                    className="dash-btn-quiet dash-btn-sm"
                     onClick={addCscRow}
                     disabled={cscRows.length >= MAX_CSC_ROWS || !form.areaId}
                   >
@@ -621,7 +621,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
         </div>
 
         <footer className="dialog-foot">
-          <button type="button" className="btn-quiet" onClick={onClose}>
+          <button type="button" className="dash-btn-quiet" onClick={onClose}>
             Cancel
           </button>
 
@@ -629,7 +629,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
             {step === 2 && (
               <button
                 type="button"
-                className="btn-quiet"
+                className="dash-btn-quiet"
                 onClick={() => setStep(1)}
                 disabled={saving}
               >
@@ -640,7 +640,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
             {step === 1 ? (
               <button
                 type="button"
-                className="btn-primary"
+                className="dash-btn-primary"
                 onClick={goNext}
                 disabled={!ready}
                 title={!ready ? 'Waiting for the reference data to load' : undefined}
@@ -650,7 +650,7 @@ const AddSegmentDialog = ({ open, options, optionsError, onRetryOptions, onClose
             ) : (
               <button
                 type="button"
-                className="btn-primary"
+                className="dash-btn-primary"
                 onClick={submit}
                 disabled={saving}
               >

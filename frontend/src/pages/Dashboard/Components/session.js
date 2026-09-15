@@ -1,3 +1,7 @@
+import { useEffect, useState } from 'react';
+
+import axiosClient from '../../../api/axiosClient';
+
 /* =====================================================================
    Who is signed in, and what they are allowed to do.
 
@@ -14,15 +18,63 @@
 /** Roles allowed to record network data. Mirrors the API's route gate. */
 export const WRITE_ROLES = ['ADMIN', 'AREA_ENGINEER', 'ENGINEER'];
 
+const STORAGE_KEY = 'ceb_user';
+
 export function currentUser() {
   try {
     const raw =
-      localStorage.getItem('ceb_user') || sessionStorage.getItem('ceb_user');
+      localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     // Private windows and cleared site data both land here.
     return null;
   }
+}
+
+/** Keeps the stored copy in step, in whichever store it already lives. */
+function persistUser(user) {
+  try {
+    const store = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
+    store.setItem(STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // Nothing to do; the in-memory copy is still correct for this session.
+  }
+}
+
+/**
+ * The signed-in user, starting from the stored copy and then confirmed
+ * against the server.
+ *
+ * The stored copy is written once at sign-in and never changes after
+ * that, so an administrator who widens someone's role would otherwise
+ * have to tell them to sign out and back in before the buttons appeared.
+ * Re-reading /auth/me on mount removes that trap: the role is whatever
+ * the database says by the next page load.
+ */
+export function useCurrentUser() {
+  const [user, setUser] = useState(currentUser);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    axiosClient
+      .get('/auth/me')
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setUser(data);
+        persistUser(data);
+      })
+      .catch(() => {
+        // Offline, or the token has expired. The stored copy still says
+        // who they were, and every write is checked server-side anyway.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return user;
 }
 
 export function canWriteNetwork(user) {

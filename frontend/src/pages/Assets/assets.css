@@ -1,0 +1,743 @@
+/* =====================================================================
+   ASSETS PAGE
+
+   Shares the dashboard shell, cards and table by importing Dashbord.css
+   first; only what is specific to this page lives here.
+
+   Every class is prefixed `ax-`. Create React App bundles every
+   stylesheet into one file, so a generic name like `.card` or `.field`
+   written here would reach into the sign-in form and the dashboard
+   dialogs. That has happened twice on this project already — the yellow
+   sign-in buttons and the uppercased register hints — so the prefix is
+   not decoration.
+
+   The page scrolls. It carries a transformer lookup, a filter row, five
+   tiles and a table that runs to seventeen CSCs, and squeezing that into
+   a fixed viewport would make the table scroll inside a box instead of
+   the page scrolling normally.
+   ===================================================================== */
+
+.ax-page {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  grid-template-rows: none;
+  padding-bottom: 26px;
+
+  /* Grid aligns content to stretch by default, which on a short page
+     grows every row and leaves dead space inside each card. */
+  align-content: start;
+}
+
+/* Units are set apart from the figure they qualify, so `1,711 nos` never
+   reads as one number and the reader can see at a glance that the tile
+   beside it is measuring something else. */
+.ax-unit {
+  font-style: normal;
+  font-size: 0.62em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--dash-ink-muted);
+  margin-left: 1px;
+}
+
+/* The primary action, sitting on the maroon header bar.
+   dash-btn-primary cannot be used here: it is maroon on maroon and
+   disappears into the bar — the same way the Add segment button went
+   missing before. White on maroon is the only high-contrast fill left,
+   since yellow already belongs to Refresh. */
+.ax-add-button {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--dash-maroon);
+  background: #FFFFFF;
+  border: 1px solid #FFFFFF;
+  border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.ax-add-button:hover:not(:disabled) { background: #FFF3F7; }
+
+.ax-add-button:focus-visible {
+  outline: 2px solid var(--dash-yellow);
+  outline-offset: 2px;
+}
+
+/* Disabled rather than hidden: a viewer who cannot see the button
+   assumes the feature is missing; one who sees it greyed knows to ask
+   an administrator. The title attribute carries the reason. */
+.ax-add-button:disabled {
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.35);
+  cursor: default;
+}
+
+/* ------------------------------------------------------- lookup card */
+
+.ax-lookup { gap: 10px; }
+
+.ax-lookup-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ax-lookup-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.ax-lookup-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dash-ink-muted);
+}
+
+.ax-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+
+  /* Twenty-five hits would push the rest of the page off screen. */
+  max-height: 232px;
+  overflow-y: auto;
+}
+
+.ax-hit {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line);
+  border-left: 3px solid var(--dash-maroon);
+  border-radius: 8px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.ax-hit:hover {
+  background: #FCF7F9;
+  border-color: var(--dash-line-strong);
+  border-left-color: var(--dash-maroon-lift);
+  transform: translateY(-1px);
+}
+
+.ax-hit:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: 2px;
+}
+
+.ax-hit-name {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--dash-ink);
+}
+
+.ax-hit-flag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #B23A00;
+  background: #FFF1E6;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+}
+
+.ax-hit-meta {
+  font-size: 11.5px;
+  color: var(--dash-ink-soft);
+}
+
+.ax-hit-place {
+  font-size: 11px;
+  color: var(--dash-ink-muted);
+}
+
+/* ------------------------------------------------------- filter row */
+
+.ax-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  padding: 12px 14px;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+}
+
+.ax-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ax-filter > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-ink-muted);
+}
+
+.ax-filter select,
+.ax-filter input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--dash-ink);
+  padding: 7px 10px;
+  min-width: 158px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: #FFFFFF;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ax-filter select { cursor: pointer; }
+
+.ax-filter select:focus,
+.ax-filter input:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+.ax-filter-grow { flex: 1 1 200px; }
+.ax-filter-grow input { width: 100%; }
+
+.ax-filter-actions {
+  flex-direction: row;
+  gap: 8px;
+  margin-left: auto;
+  align-items: center;
+}
+
+/* A filter set from somewhere other than the row above says so. */
+.ax-active-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--dash-ink);
+  padding: 8px 12px;
+  background: #FFF9E0;
+  border: 1px solid #F0E3A8;
+  border-radius: 8px;
+}
+
+.ax-totals { grid-template-columns: repeat(5, 1fr); }
+
+/* ------------------------------------------------- category cards */
+
+.ax-main { gap: 10px; }
+
+.ax-view-hint { margin: 0 0 2px; }
+
+.ax-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.ax-card {
+  border: 1px solid var(--dash-line);
+  border-radius: 10px;
+  background: #FFFFFF;
+  overflow: hidden;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.ax-card:hover { box-shadow: var(--dash-shadow); }
+
+.ax-card.is-open {
+  border-color: var(--ax-accent);
+  box-shadow: var(--dash-shadow);
+
+  /* An opened card spans the grid so its types list in one column
+     instead of a cramped strip inside a 268px cell. */
+  grid-column: 1 / -1;
+}
+
+.ax-card.is-empty { opacity: 0.62; }
+
+.ax-card-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'title  chevron'
+    'values chevron'
+    'meta   chevron';
+  gap: 2px 10px;
+  align-items: center;
+
+  text-align: left;
+  font: inherit;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ax-card-head:focus-visible {
+  outline: 2px solid var(--ax-accent);
+  outline-offset: -2px;
+}
+
+.ax-card-title {
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--dash-ink);
+}
+
+/* Colour is decoration only. Every value on the card is written out as
+   text, so nothing here depends on telling the hues apart. */
+.ax-card-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--ax-accent);
+  flex: none;
+}
+
+.ax-card-values {
+  grid-area: values;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.ax-card-value {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ax-card-value em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+  margin-left: 3px;
+}
+
+.ax-card-meta {
+  grid-area: meta;
+  font-size: 11px;
+  color: var(--dash-ink-muted);
+}
+
+.ax-card-chevron {
+  grid-area: chevron;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: #F6F1F3;
+  color: var(--dash-ink-soft);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ax-card.is-open .ax-card-chevron {
+  background: var(--ax-accent);
+  color: #FFFFFF;
+}
+
+/* ------------------------------------------------ types drill-down */
+
+.ax-types {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 7px;
+  border-top: 1px solid var(--dash-line);
+  padding-top: 11px;
+}
+
+.ax-type {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name  value'
+    'meta  value';
+  gap: 1px 10px;
+  align-items: center;
+
+  text-align: left;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ax-type:hover { background: #FCF7F9; border-color: var(--dash-line-strong); }
+
+.ax-type:focus-visible {
+  outline: 2px solid var(--ax-accent);
+  outline-offset: 1px;
+}
+
+.ax-type.is-selected {
+  border-color: var(--ax-accent);
+  background: #FFF9FB;
+  box-shadow: inset 3px 0 0 var(--ax-accent);
+}
+
+.ax-type.is-zero { opacity: 0.55; }
+
+.ax-type-name {
+  grid-area: name;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dash-ink);
+}
+
+.ax-type-meta {
+  grid-area: meta;
+  font-size: 10.5px;
+  color: var(--dash-ink-muted);
+}
+
+.ax-type-value {
+  grid-area: value;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ax-type-value em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+  margin-left: 2px;
+}
+
+/* -------------------------------------------------- records table */
+
+.ax-records { max-height: 520px; }
+
+.ax-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+}
+
+/* --------------------------------------------- detail + add dialogs */
+
+.ax-detail-dialog { max-width: 880px; }
+.ax-add-dialog    { max-width: 940px; }
+
+.ax-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.ax-detail-grid h3,
+.ax-detail-block h3 {
+  margin: 0 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-maroon);
+}
+
+.ax-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--dash-line);
+  font-size: 12.5px;
+}
+
+.ax-detail-row:last-child { border-bottom: none; }
+.ax-detail-row > span { color: var(--dash-ink-muted); flex: none; }
+
+.ax-detail-row > strong {
+  font-weight: 600;
+  color: var(--dash-ink);
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ax-blank {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--dash-ink-muted);
+}
+
+.ax-detail-block { margin-top: 16px; }
+
+.ax-block-hint {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--dash-ink-muted);
+}
+
+.ax-blank-block {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--dash-ink-soft);
+  padding: 10px 12px;
+  background: #FAF7F8;
+  border-radius: 8px;
+}
+
+.ax-mini-table { max-height: 220px; }
+
+.ax-status-warn {
+  background: #FFF1E6;
+  border-color: #F3CBA8;
+  color: #7A3300;
+}
+
+.ax-holdings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 7px;
+}
+
+.ax-holdings li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name  value'
+    'recs  value';
+  gap: 1px 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid var(--dash-line);
+  border-radius: 8px;
+}
+
+.ax-holding-name {
+  grid-area: name;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dash-ink);
+}
+
+.ax-holding-cat {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--dash-ink-muted);
+}
+
+.ax-holding-recs {
+  grid-area: recs;
+  font-size: 10.5px;
+  color: var(--dash-ink-muted);
+}
+
+.ax-holding-value {
+  grid-area: value;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ax-holding-value em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+}
+
+/* ----------------------------------------------------- add dialog */
+
+.ax-add-rows {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ax-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 0.85fr 0.8fr auto;
+  gap: 9px;
+  align-items: start;
+}
+
+.ax-qty-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ax-qty-input input { flex: 1 1 auto; min-width: 0; }
+
+.ax-qty-input em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dash-ink-muted);
+  min-width: 24px;
+}
+
+/* Aligned to the inputs, not the labels, so it does not float above the
+   row on the first line where the labels are. */
+.ax-row-remove {
+  align-self: end;
+  width: 30px;
+  height: 32px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--dash-ink-muted);
+  background: transparent;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.ax-row-remove:hover {
+  color: #B4234A;
+  border-color: #E7B9C7;
+  background: #FDF3F6;
+}
+
+.ax-pending {
+  margin-top: 12px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--dash-ink);
+  background: #FFF9E0;
+  border: 1px solid #F0E3A8;
+  border-radius: 8px;
+}
+
+.ax-saved-banner {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #145C3F;
+  background: #E8F7F0;
+  border: 1px solid #B3E3CE;
+  border-radius: 8px;
+}
+
+.ax-saved-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.ax-saved-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--dash-line);
+  border-left: 3px solid var(--dash-maroon);
+  border-radius: 8px;
+}
+
+.ax-saved-total .summary-value em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+}
+
+/* ------------------------------------------------------- narrower */
+
+@media (max-width: 1180px) {
+  .ax-totals { grid-template-columns: repeat(3, 1fr); }
+  .ax-filter-actions { margin-left: 0; }
+  .ax-add-row { grid-template-columns: 1fr 1fr; }
+  .ax-row-remove { grid-column: 2; justify-self: end; }
+}
+
+@media (max-width: 760px) {
+  .ax-totals { grid-template-columns: repeat(2, 1fr); }
+  .ax-filter { flex: 1 1 100%; }
+  .ax-filter select,
+  .ax-filter input { min-width: 0; width: 100%; }
+  .ax-add-row { grid-template-columns: 1fr; }
+  .ax-row-remove { grid-column: 1; }
+}
+
+/* The download picker needs more room than a filter: its options name
+   what the file contains, and truncating those to "Used assets — ..."
+   would make the choice a guess. */
+.ax-filter-download select { min-width: 250px; }
+
+@media (max-width: 1180px) {
+  .ax-filter-download { flex: 1 1 100%; }
+  .ax-filter-download select { min-width: 0; width: 100%; }
+}
+
+
+/* A transformer line in the Add assets dialog: its own serial number,
+   substation and rating, under the type it was chosen as. */
+.ax-tx-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 10px;
+  padding: 10px 12px;
+  background: #FFF9E0;
+  border: 1px solid #F0E3A8;
+  border-left: 3px solid #EDA100;
+  border-radius: 8px;
+}
+
+.ax-tx-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--dash-ink-soft);
+}

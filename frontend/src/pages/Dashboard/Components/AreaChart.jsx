@@ -41,7 +41,7 @@ import {
    already see.
    --------------------------------------------------------------------- */
 
-const AreaChart = ({ data }) => {
+const AreaChart = ({ data, onPick }) => {
   const chartData = useMemo(
     () =>
       // groupSum sorts descending, and in a vertical-layout chart Recharts
@@ -92,6 +92,9 @@ const AreaChart = ({ data }) => {
             radius={[0, 4, 4, 0]}
             maxBarSize={16}
             isAnimationActive={false}
+            /* Selecting an area's bar narrows the dashboard to it. */
+            onClick={onPick ? (entry) => onPick(entry?.payload?.key ?? entry?.key) : undefined}
+            style={onPick ? { cursor: 'pointer' } : undefined}
           >
             <LabelList
               dataKey="value"

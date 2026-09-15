@@ -1,0 +1,106 @@
+/* =====================================================================
+   REPORTS PAGE
+
+   Shares the dashboard shell by importing Dashbord.css first; only what
+   is specific to this page lives here.
+
+   Every class is prefixed `rp-`. Create React App bundles every
+   stylesheet into one file, so a generic name written here would reach
+   into the sign-in form and the dashboard dialogs. That has happened
+   twice on this project already.
+   ===================================================================== */
+
+.rp-page {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  grid-template-rows: none;
+  align-content: start;
+  padding-bottom: 26px;
+}
+
+.rp-notice { margin: 0; }
+
+.rp-builder {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rp-field > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-ink-muted);
+}
+
+.rp-field select,
+.rp-field input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--dash-ink);
+  padding: 8px 10px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: #FFFFFF;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.rp-field select { cursor: pointer; }
+
+.rp-field select:focus,
+.rp-field input:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+/* The report picker and the label both hold sentences, not words, so
+   they get room rather than being squeezed to a filter's width. */
+.rp-field-wide { flex: 1 1 280px; }
+.rp-field-wide select,
+.rp-field-wide input { width: 100%; }
+
+.rp-actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+/* What the selected report actually contains. Sits under the row rather
+   than inside the dropdown, where an option label has no room to
+   explain itself. */
+.rp-note {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--dash-ink-soft);
+  background: #FAF7F8;
+  border-left: 3px solid var(--dash-line-strong);
+  border-radius: 0 8px 8px 0;
+}
+
+.rp-page code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+  background: #F4EEF1;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .rp-field-wide { flex: 1 1 100%; }
+  .rp-actions { width: 100%; }
+  .rp-actions button { flex: 1 1 auto; }
+}

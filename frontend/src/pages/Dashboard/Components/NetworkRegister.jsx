@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import axiosClient from '../../../api/axiosClient';
 import DataTable from './DataTable';
 import AddSegmentDialog from './AddSegmentDialog';
 import ImportDialog from './ImportDialog';
 import { downloadFromApi } from './fileTransfer';
-import { currentUser, canWriteNetwork } from './session';
+import { useCurrentUser, canWriteNetwork } from './session';
 import { num, formatNumber } from './data';
+import { EMPTY_PLACE, describePlace, isPlaceSet } from './PlaceFilter';
 
 /**
  * The register card: one table, six ways of reading it.
@@ -50,7 +51,9 @@ const VIEWS = {
       { key: 'area', label: 'Area' },
       { key: 'transformers', label: 'Transformers', numeric: true, total: 'sum', share: true },
       { key: 'kva', label: 'Installed kVA', numeric: true, total: 'sum' },
-      { key: 'networkKm', label: 'Network km', numeric: true, decimals: 2, total: 'sum' },
+      /* HV line inside each CSC, from the segment register -- the same
+         source as the HV Line tile, so column and tile agree. */
+      { key: 'networkKm', label: 'HV km', numeric: true, decimals: 2, total: 'sum' },
     ],
   },
 
@@ -204,7 +207,16 @@ const describeError = (err) =>
     ? `The server returned ${err.response.status}.`
     : 'Could not reach the API. Check that Laravel is running on port 8000.';
 
-const NetworkRegister = ({ cscSummaryRows, onToast }) => {
+const NetworkRegister = ({
+  cscSummaryRows,
+  onToast,
+  focus,
+  place = EMPTY_PLACE,
+  placeOptions,
+  dataVersion = 0,
+  onDataChanged,
+  profile,
+}) => {
   const [view, setView] = useState('transformers');
   const [cache, setCache] = useState({});
   const [segmentRows, setSegmentRows] = useState(undefined);
@@ -220,9 +232,104 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
 
   const config = VIEWS[view];
 
-  /* Read once per mount. Hiding the buttons is a courtesy, not the gate:
-     the API checks the same roles on every write. */
-  const user = useMemo(() => currentUser(), []);
+  /*
+   * The dashboard's place filter.
+   *
+   * Every tab narrows to the chosen province, area or CSC, so picking
+   * "Badulla" shows Badulla's transformers, its line, its feeders, its
+   * segments and its assets together. Rows that carry only a CSC are
+   * placed in their area through the CSC list; rows that carry only an
+   * area are placed in their province through the area list.
+   */
+  const placeActive = isPlaceSet(place);
+  const placeLabel = describePlace(place, placeOptions);
+
+  /*
+   * Profile or table.
+   *
+   * With a place chosen, the card opens on the place profile -- the
+   * place described, with the places inside it as cards -- because that
+   * is what somebody who searched for a place wants to see. The table is
+   * one click away. With no place chosen there is nothing to profile, so
+   * the table is all there is.
+   */
+  const [mode, setMode] = useState('profile');
+  const wasActive = useRef(placeActive);
+  useEffect(() => {
+    if (placeActive && !wasActive.current) setMode('profile');
+    wasActive.current = placeActive;
+  }, [placeActive]);
+
+  const showProfile = placeActive && Boolean(profile) && mode === 'profile';
+
+  const { cscById, areaById } = useMemo(() => {
+    const cscMap = new Map();
+    const areaMap = new Map();
+    for (const c of placeOptions?.cscs || []) cscMap.set(String(c.csc_id), c);
+    for (const a of placeOptions?.areas || []) areaMap.set(String(a.area_id), a);
+    return { cscById: cscMap, areaById: areaMap };
+  }, [placeOptions]);
+
+  const inPlace = useCallback(
+    (r) => {
+      if (!placeActive) return true;
+
+      const csc = r.csc_id ?? r.origin_csc_id;
+      const hasCsc = csc !== undefined && csc !== null;
+      const areaId = r.area_id ?? (hasCsc ? cscById.get(String(csc))?.area_id : undefined);
+      const hasArea = areaId !== undefined && areaId !== null;
+      const provinceId =
+        r.province_id ?? (hasArea ? areaById.get(String(areaId))?.province_id : undefined);
+
+      if (place.cscId) {
+        if (hasCsc) return String(csc) === String(place.cscId);
+        // An area row: keep the area the chosen CSC belongs to.
+        const cscArea = cscById.get(String(place.cscId))?.area_id;
+        return hasArea && String(areaId) === String(cscArea);
+      }
+
+      if (place.areaId) {
+        return hasArea && String(areaId) === String(place.areaId);
+      }
+
+      return (
+        provinceId !== undefined &&
+        provinceId !== null &&
+        String(provinceId) === String(place.provinceId)
+      );
+    },
+    [placeActive, place.cscId, place.areaId, place.provinceId, cscById, areaById]
+  );
+
+  /* Something was added -- here, on another page, or by someone else --
+     so every cached tab is stale. Skipped on first render, which has
+     nothing cached yet. */
+  const seenVersion = useRef(dataVersion);
+  useEffect(() => {
+    if (dataVersion === seenVersion.current) return;
+    seenVersion.current = dataVersion;
+    setCache({});
+    setSegmentRows(undefined);
+  }, [dataVersion]);
+
+  /* The global search asking for a particular tab and term.
+     Applied only when `focus` actually changes, so it steers the
+     register on arrival and then leaves it alone — otherwise a reader
+     who switched tabs afterwards would be dragged back on every
+     render. */
+  useEffect(() => {
+    if (!focus) return;
+    if (focus.view && VIEWS[focus.view]) setView(focus.view);
+    setSearch(focus.search || '');
+  }, [focus]);
+
+  /* Confirmed against the server on mount, so a role widened by an
+     administrator takes effect on the next page load rather than only
+     after signing out and back in.
+
+     Greying the buttons is a courtesy, not the gate: the API checks the
+     same roles on every write. */
+  const user = useCurrentUser();
   const mayWrite = canWriteNetwork(user);
   const writeBlockedReason = user
     ? `Signed in as ${user.role || 'a viewer'}, which cannot record network data.`
@@ -251,6 +358,18 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
     }
   }, [view, config.endpoint, cache, fetchView]);
 
+  /* The Assets tab's province totals cannot be narrowed to a place, so
+     when a place is chosen it reads the per-CSC breakdown instead and
+     adds that up for the place. */
+  useEffect(() => {
+    if (view !== 'assets' || !placeActive || cache.assetsByCsc !== undefined) return;
+
+    axiosClient
+      .get('/network/assets/by-csc')
+      .then(({ data }) => setCache((c) => ({ ...c, assetsByCsc: data || [] })))
+      .catch((err) => setViewError(describeError(err)));
+  }, [view, placeActive, cache.assetsByCsc]);
+
   /* Segments are fetched with the search term rather than cached, and the
      keystrokes are debounced so typing does not fire a request per
      letter. */
@@ -259,7 +378,12 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
     setLoadingView(true);
     try {
       const { data } = await axiosClient.get('/network/segments', {
-        params: { limit: 500, search: term || undefined },
+        params: {
+          limit: 500,
+          search: term || undefined,
+          area_id: place.areaId || undefined,
+          csc_id: place.cscId || undefined,
+        },
       });
       setSegmentRows(data || []);
     } catch (err) {
@@ -269,13 +393,13 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
     } finally {
       setLoadingView(false);
     }
-  }, []);
+  }, [place.areaId, place.cscId]);
 
   useEffect(() => {
     if (view !== 'segments') return undefined;
     const timer = setTimeout(() => loadSegments(search.trim()), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [view, search, loadSegments]);
+  }, [view, search, loadSegments, dataVersion]);
 
   const loadOptions = useCallback(async () => {
     setOptionsError('');
@@ -319,13 +443,20 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
 
   /* Anything derived from segment_register is stale after a write, and
      the new rows are easiest to see in the Segments list. */
-  const afterWrite = (message) => {
+  const afterWrite = (message, { keepImportOpen = false } = {}) => {
     setAddOpen(false);
-    setImportOpen(false);
+    /* An import keeps its dialog open. Closing it on success threw away
+       the "How the file was read" and "Where it was filed" panels the
+       moment they appeared, so nobody ever saw them. */
+    if (!keepImportOpen) setImportOpen(false);
     onToast?.(message);
+
+    // The dashboard's tiles and charts are stale too.
+    onDataChanged?.();
 
     setCache((c) => {
       const next = { ...c };
+      delete next.assetsByCsc;
       delete next.areas;
       delete next.cscs;
       delete next.feeders;
@@ -337,12 +468,44 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
     setView('segments');
   };
 
-  const rows =
-    view === 'segments'
-      ? segmentRows
-      : config.endpoint
-      ? cache[view]
-      : cscSummaryRows;
+  const rows = useMemo(() => {
+    if (view === 'segments') return segmentRows;
+
+    if (view === 'assets' && placeActive) {
+      if (cache.assetsByCsc === undefined) return undefined;
+
+      // Per unit, never mixed: poles and kilometres stay separate rows.
+      const byType = new Map();
+      for (const r of cache.assetsByCsc.filter(inPlace)) {
+        const key = `${r.asset_type_id}-${r.unit_of_measure}`;
+        const agg = byType.get(key) || {
+          asset_type_id: r.asset_type_id,
+          type_name: r.type_name,
+          category_name: r.category_name,
+          unit_of_measure: r.unit_of_measure,
+          total_quantity: 0,
+          placements: 0,
+          cscs: new Set(),
+          areas: new Set(),
+        };
+        agg.total_quantity += num(r.total_quantity);
+        agg.placements += num(r.placements);
+        agg.cscs.add(r.csc_id);
+        agg.areas.add(r.area_id);
+        byType.set(key, agg);
+      }
+
+      return Array.from(byType.values()).map(({ cscs, areas, ...rest }) => ({
+        ...rest,
+        csc_count: cscs.size,
+        area_count: areas.size,
+      }));
+    }
+
+    const source = config.endpoint ? cache[view] : cscSummaryRows;
+    if (!source || !placeActive) return source;
+    return source.filter(inPlace);
+  }, [view, segmentRows, placeActive, cache, config.endpoint, cscSummaryRows, inPlace]);
 
   const summary = useMemo(() => {
     if (!rows || rows.length === 0) return null;
@@ -368,10 +531,16 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
 
     if (view === 'segments') {
       const crossing = rows.filter((r) => num(r.csc_count) > 1).length;
-      const entered = rows.filter((r) => ENTERED_SOURCES.includes(r.source_file)).length;
+      const added = rows.filter((r) => ENTERED_SOURCES.includes(r.source_file));
+      const addedKm = added.reduce((s, r) => s + num(r.length_km), 0);
+
       return `${formatNumber(km, 3)} km across ${formatNumber(rows.length)} segments${
         crossing > 0 ? `, ${formatNumber(crossing)} crossing` : ''
-      }${entered > 0 ? `, ${formatNumber(entered)} added here` : ''}`;
+      }${
+        added.length > 0
+          ? `, ${formatNumber(addedKm, 3)} km added here`
+          : ''
+      }`;
     }
 
     if (view === 'feeders') {
@@ -390,6 +559,27 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
   return (
     <>
       <div className="register-toolbar">
+        {placeActive && profile && (
+          <div className="register-tabs register-mode" role="tablist" aria-label="How to show it">
+            {[
+              ['profile', 'Profile'],
+              ['table', 'Table'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={mode === key}
+                className={`register-tab${mode === key ? ' is-active' : ''}`}
+                onClick={() => setMode(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!showProfile && (
         <div className="register-tabs" role="tablist" aria-label="Register view">
           {Object.entries(VIEWS).map(([key, v]) => (
             <button
@@ -404,9 +594,10 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
             </button>
           ))}
         </div>
+        )}
 
         <div className="register-toolbar-right">
-          {config.searchable && (
+          {config.searchable && !showProfile && (
             <input
               type="search"
               className="register-search"
@@ -417,11 +608,25 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
             />
           )}
 
-          {summary && <span className="register-summary">{summary}</span>}
+          {summary && !showProfile && <span className="register-summary">{summary}</span>}
+
+          {placeActive && (
+            <span className="register-place-chip" title="Change this with the place filter above">
+              {placeLabel}
+            </span>
+          )}
+
+          {/* A greyed button with only a tooltip reads as broken. Say why
+              it is off, where it will actually be seen. */}
+          {!mayWrite && (
+            <span className="register-readonly" title={writeBlockedReason}>
+              Read only &middot; {user?.role || 'not signed in'}
+            </span>
+          )}
 
           <button
             type="button"
-            className="btn-quiet btn-sm"
+            className="dash-btn-quiet dash-btn-sm"
             onClick={runExport}
             disabled={exporting}
             title="Download the asset report: province, then each area, then each CSC"
@@ -431,7 +636,7 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
 
           <button
             type="button"
-            className="btn-quiet btn-sm"
+            className="dash-btn-quiet dash-btn-sm"
             onClick={() => setImportOpen(true)}
             disabled={!mayWrite}
             title={mayWrite ? 'Load a sheet of segments' : writeBlockedReason}
@@ -441,19 +646,21 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
 
           <button
             type="button"
-            className="btn-primary btn-sm"
+            className="dash-btn-primary dash-btn-sm"
             onClick={openAdd}
             disabled={!mayWrite}
-            title={mayWrite ? 'Record a new segment' : writeBlockedReason}
+            title={mayWrite ? 'Record a length of HV line' : writeBlockedReason}
           >
-            + Add segment
+            + HV Length
           </button>
         </div>
       </div>
 
-      {viewError && <div className="register-error">{viewError}</div>}
+      {!showProfile && viewError && <div className="register-error">{viewError}</div>}
 
-      {loadingView && rows === undefined ? (
+      {showProfile ? (
+        profile
+      ) : loadingView && rows === undefined ? (
         <div className="chart-empty">Loading {config.label.toLowerCase()}...</div>
       ) : (
         <DataTable
@@ -461,10 +668,12 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
           rows={rows}
           rowKey={ROW_KEYS[view]}
           initialSortKey={config.sort}
-          footerLabel={config.footerLabel}
+          footerLabel={placeActive ? `Total · ${placeLabel}` : config.footerLabel}
           emptyMessage={
             view === 'segments' && search
               ? `Nothing matches "${search}".`
+              : placeActive
+              ? `Nothing recorded for ${placeLabel}.`
               : config.empty
           }
           isRowMuted={
@@ -489,7 +698,7 @@ const NetworkRegister = ({ cscSummaryRows, onToast }) => {
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImported={afterWrite}
+        onImported={(message) => afterWrite(message, { keepImportOpen: true })}
       />
     </>
   );

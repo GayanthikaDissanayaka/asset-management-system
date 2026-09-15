@@ -41,7 +41,10 @@
   overflow: hidden;
 
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1.15fr);
+  /* header, place bar, tiles, charts, register. The place bar is always
+     present so its row never appears and disappears; see
+     .dashboard-subbar. */
+  grid-template-rows: auto auto auto minmax(0, 1fr) minmax(0, 1.15fr);
   gap: 12px;
 
   padding: 14px 18px;
@@ -563,7 +566,7 @@
 
 /* --------------------------------------------- shared button shapes */
 
-.btn-primary {
+.dash-btn-primary {
   background: var(--dash-maroon);
   color: #FFFFFF;
   border: 1px solid var(--dash-maroon);
@@ -576,12 +579,12 @@
   transition: background 0.15s;
 }
 
-.btn-primary:hover:not(:disabled) { background: var(--dash-maroon-lift); }
-.btn-primary:disabled { opacity: 0.55; cursor: default; }
+.dash-btn-primary:hover:not(:disabled) { background: var(--dash-maroon-lift); }
+.dash-btn-primary:disabled { opacity: 0.55; cursor: default; }
 
-.btn-primary.btn-sm { padding: 6px 12px; font-size: 12px; }
+.dash-btn-primary.dash-btn-sm { padding: 6px 12px; font-size: 12px; }
 
-.btn-quiet {
+.dash-btn-quiet {
   background: #FFFFFF;
   color: var(--dash-ink-soft);
   border: 1px solid var(--dash-line-strong);
@@ -594,13 +597,13 @@
   transition: background 0.15s, border-color 0.15s;
 }
 
-.btn-quiet:hover:not(:disabled) {
+.dash-btn-quiet:hover:not(:disabled) {
   background: #FAF5F7;
   border-color: var(--dash-maroon);
   color: var(--dash-maroon);
 }
 
-.btn-quiet:disabled { opacity: 0.55; cursor: default; }
+.dash-btn-quiet:disabled { opacity: 0.55; cursor: default; }
 
 .dashboard-inline-notice {
   font-size: 11.5px;
@@ -613,6 +616,81 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Sits beside Refresh in the dark header, quieter than the yellow
+   primary action but clearly available. Administrators only. */
+.approvals-button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.approvals-button:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.approvals-button:focus-visible {
+  outline: 2px solid var(--dash-yellow);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------- approval rows */
+
+.approval-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.approval-row:last-child { border-bottom: none; }
+
+.approval-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--dash-ink-muted);
+}
+
+.approval-who strong { font-size: 13.5px; color: var(--dash-ink); }
+
+.approval-asked {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #F4EDF0;
+  color: var(--dash-maroon);
+  font-weight: 650;
+  font-size: 11px;
+}
+
+/* Role, area and CSC are one decision, so they sit on one line. */
+.approval-grant {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .approval-grant { grid-template-columns: 1fr; }
 }
 
 /* ------------------------------------------------- register toolbar */
@@ -710,6 +788,21 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   vertical-align: middle;
+  cursor: help;
+}
+
+/* Says why the write buttons are off, beside them, rather than leaving a
+   greyed button to look broken. */
+.register-readonly {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #F4EDF0;
+  color: var(--dash-maroon);
+  white-space: nowrap;
   cursor: help;
 }
 
@@ -866,22 +959,30 @@
   border: 1px solid #F2D3DA;
 }
 
-/* ------------------------------------------------------------ fields */
+/* ------------------------------------------------------------ fields
 
-.field-grid {
+   Every rule here is scoped to `.dialog`.
+
+   `field`, `field-error` and `invalid` are also used by the sign-in and
+   registration screens in Auth/auth.css. Create React App bundles every
+   stylesheet into one file, so an unscoped `.field > span` here reached
+   into those forms and set their hint text in bold uppercase. Scoping is
+   what keeps the two apart; do not lift these back out. */
+
+.dialog .field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
 }
 
-.field {
+.dialog .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.field > span {
+.dialog .field > span {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -889,9 +990,9 @@
   color: var(--dash-ink-muted);
 }
 
-.field select,
-.field input,
-.quantity-field input {
+.dialog .field select,
+.dialog .field input,
+.dialog .quantity-field input {
   font: inherit;
   font-size: 13px;
   color: var(--dash-ink);
@@ -903,19 +1004,19 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.field select:focus,
-.field input:focus,
-.quantity-field input:focus {
+.dialog .field select:focus,
+.dialog .field input:focus,
+.dialog .quantity-field input:focus {
   outline: none;
   border-color: var(--dash-maroon);
   box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
 }
 
-.field select:disabled { background: #F6F2F4; color: var(--dash-ink-muted); }
+.dialog .field select:disabled { background: #F6F2F4; color: var(--dash-ink-muted); }
 
-.field .invalid { border-color: #B3271A; }
+.dialog .field .invalid { border-color: #B3271A; }
 
-.field-error {
+.dialog .field-error {
   font-size: 11px;
   font-style: normal;
   color: #B3271A;
@@ -979,7 +1080,7 @@
   text-overflow: ellipsis;
 }
 
-.quantity-field input { padding: 6px 8px; }
+.dialog .quantity-field input { padding: 6px 8px; }
 
 /* Running total. Turns amber when the conductor lengths do not add up to
    the route length, which is a flag rather than a block. */
@@ -1071,7 +1172,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.btn-quiet.btn-sm { padding: 6px 12px; font-size: 12px; }
+.dash-btn-quiet.dash-btn-sm { padding: 6px 12px; font-size: 12px; }
 
 /* Marks a segment running through more than one CSC. Hovering shows the
    split. */
@@ -1261,4 +1362,1051 @@
   .dashboard-page.is-refreshing .dashboard-table-card {
     transition: none;
   }
+}
+
+/* =====================================================================
+   GLOBAL SEARCH
+
+   Lives inside the header bar, not in a band of its own: the dashboard
+   is deliberately one screen with no scrolling, and another row would
+   push the charts off it. The results panel is absolutely positioned so
+   it overlays the page rather than displacing anything.
+
+   Every class is prefixed `gs-`. This stylesheet is bundled into the
+   same file as the auth screens, so a generic name here reaches into
+   them — that has caused two regressions on this project already.
+   ===================================================================== */
+
+.gs {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 160px;
+  max-width: 460px;
+  margin: 0 14px;
+}
+
+.gs-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 9px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-field:focus-within {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+}
+
+.gs-icon {
+  font-size: 15px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.gs-field:focus-within .gs-icon { color: var(--dash-maroon); }
+
+.gs-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: #FFFFFF;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+}
+
+.gs-input::placeholder { color: rgba(255, 255, 255, 0.72); }
+.gs-input:focus { outline: none; }
+
+.gs-field:focus-within .gs-input { color: var(--dash-ink); }
+.gs-field:focus-within .gs-input::placeholder { color: var(--dash-ink-muted); }
+
+/* Chrome draws its own clear affordance on type=search; it lands on the
+   maroon bar as an invisible dark smudge. */
+.gs-input::-webkit-search-cancel-button { display: none; }
+
+.gs-busy {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 2px solid rgba(107, 0, 44, 0.25);
+  border-top-color: var(--dash-maroon);
+  border-radius: 50%;
+  animation: gs-spin 0.7s linear infinite;
+}
+
+@keyframes gs-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-busy { animation-duration: 2.4s; }
+}
+
+/* ------------------------------------------------------------ panel */
+
+.gs-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 7px);
+  left: 0;
+  right: 0;
+  min-width: 420px;
+
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 11px;
+  box-shadow: 0 12px 34px rgba(43, 10, 22, 0.22);
+  overflow: hidden;
+}
+
+.gs-message {
+  padding: 14px;
+  font-size: 12.5px;
+  color: var(--dash-ink-muted);
+}
+
+.gs-error { color: #A11B3E; }
+
+.gs-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+
+  /* Twelve hits at once would run past the fold on a laptop. */
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.gs-hit {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 82px 1fr auto;
+  gap: 10px;
+  align-items: center;
+
+  text-align: left;
+  font: inherit;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.gs-hit.is-active { background: #FBF3F7; }
+
+.gs-hit:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: -2px;
+}
+
+/* The kind is named in words, never by colour alone — the accent is a
+   second cue for people who already read the label. */
+.gs-kind {
+  justify-self: start;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gs-accent);
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.gs-body { min-width: 0; display: grid; gap: 1px; }
+
+.gs-title {
+  font-size: 12.5px;
+  font-weight: 640;
+  color: var(--dash-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-flag {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #B23A00;
+  background: #FFF1E6;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+}
+
+.gs-sub {
+  font-size: 11px;
+  color: var(--dash-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-place {
+  font-size: 10.5px;
+  color: var(--dash-ink-muted);
+  white-space: nowrap;
+  justify-self: end;
+}
+
+.gs-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--dash-ink-muted);
+  background: #FAF7F8;
+  border-top: 1px solid var(--dash-line);
+}
+
+.gs-hint { white-space: nowrap; }
+
+@media (max-width: 980px) {
+  /* Below this the header is already wrapping; a search box competing
+     for the same row makes both unusable. */
+  .gs { flex-basis: 100%; margin: 6px 0 0; max-width: none; }
+  .gs-panel { min-width: 0; }
+  .gs-hit { grid-template-columns: 74px 1fr; }
+  .gs-place { display: none; }
+}
+
+/* --------------------------------------------------- import: filing
+
+   Where each place name in the sheet was filed. The sheet says
+   "Hali Ela"; the register says BDL-CSC02. Showing the mapping is what
+   makes an import checkable instead of merely reported. */
+
+.import-places li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.import-place-given {
+  font-weight: 650;
+  color: var(--dash-ink);
+}
+
+.import-place-arrow { color: var(--dash-ink-muted); }
+
+.import-place-to { color: var(--dash-ink-soft); }
+
+/* Marks a name that was interpreted rather than read literally, so the
+   rows worth checking are the ones that stand out. */
+.import-place-flag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8A5A00;
+  background: #FFF3D6;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.import-place-rows {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--dash-ink-muted);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------- sign-in greeting
+
+   Shown on arrival from the sign-in screen, not on the auth page: that
+   page navigates away half a second after its toast appears, which is
+   not long enough to read a welcome.
+
+   A strip of its own rather than the header's inline notice, which
+   already shares its row with the search box and four buttons. */
+
+.dashboard-welcome {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--dash-ink);
+  background: linear-gradient(90deg, #FFF9E0 0%, #FFFDF5 62%);
+  border: 1px solid #F0E3A8;
+  border-left: 3px solid var(--dash-yellow-deep);
+  border-radius: var(--dash-radius);
+
+  animation: dash-welcome-in 0.28s ease-out;
+}
+
+.dashboard-welcome-text { min-width: 0; }
+
+.dashboard-welcome strong {
+  font-weight: 700;
+  color: var(--dash-maroon);
+}
+
+.dashboard-welcome-close {
+  margin-left: auto;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--dash-ink-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dashboard-welcome-close:hover {
+  background: rgba(107, 0, 44, 0.08);
+  color: var(--dash-maroon);
+}
+
+@keyframes dash-welcome-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-welcome { animation: none; }
+}
+
+
+/* =====================================================================
+   PLACE BAR
+
+   Its own grid row, always rendered. The dashboard is a fixed-height
+   grid with a row per band; the sign-in greeting used to be a strip that
+   came and went, and while it showed it took a row and pushed the
+   register off the bottom of the screen. It now sits in this row.
+   ===================================================================== */
+
+.dashboard-subbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+
+  padding: 8px 12px;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+}
+
+.dashboard-scope {
+  align-self: center;
+  font-size: 12.5px;
+  color: var(--dash-ink-soft);
+  white-space: nowrap;
+}
+
+.dashboard-scope strong { color: var(--dash-maroon); }
+
+.dashboard-welcome-inline {
+  margin-left: auto;
+  align-self: center;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+/* -------------------------------------------------------- pickers */
+
+.pf {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pf-field > span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-ink-muted);
+}
+
+.pf-field select {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--dash-ink);
+  padding: 5px 8px;
+  min-width: 150px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 7px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pf-field select:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+.pf-field select:disabled { opacity: 0.6; cursor: default; }
+
+.pf-clear { align-self: flex-end; }
+
+/* The register says which place it is showing, beside its own summary,
+   so a filtered total is never read as the province's. */
+.register-place-chip {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--dash-maroon);
+  background: #FBEFF4;
+  border: 1px solid #F0D3DF;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ approvals badge */
+
+.approvals-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--dash-maroon-deep);
+  background: var(--dash-yellow);
+  border-radius: 999px;
+}
+
+/* =====================================================================
+   NOTIFICATION BELL
+
+   Classes prefixed nb-; this stylesheet is bundled with the sign-in
+   screens and a generic name would reach into them.
+   ===================================================================== */
+
+.nb { position: relative; }
+
+.nb-bell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nb-bell:hover { background: rgba(255, 255, 255, 0.22); }
+
+.nb-bell:focus-visible {
+  outline: 2px solid var(--dash-yellow);
+  outline-offset: 2px;
+}
+
+.nb-bell.has-count { animation: nb-ring 0.6s ease-in-out 2; }
+
+.nb-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--dash-maroon-deep);
+  background: var(--dash-yellow);
+  border: 2px solid var(--dash-maroon);
+  border-radius: 999px;
+}
+
+@keyframes nb-ring {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
+
+.nb-panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 32px));
+
+  color: var(--dash-ink);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 11px;
+  box-shadow: 0 12px 34px rgba(43, 10, 22, 0.22);
+  overflow: hidden;
+}
+
+.nb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.nb-empty {
+  margin: 0;
+  padding: 16px 12px;
+  font-size: 12.5px;
+  color: var(--dash-ink-muted);
+}
+
+.nb-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.nb-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nb-item:hover { background: #FBF3F7; }
+
+.nb-item.is-unread { box-shadow: inset 3px 0 0 var(--dash-maroon); background: #FFFAFC; }
+.nb-item.is-resolved { opacity: 0.66; }
+
+.nb-item-title { font-size: 12.5px; font-weight: 650; color: var(--dash-ink); }
+.nb-item-body { font-size: 11.5px; color: var(--dash-ink-soft); }
+.nb-item-meta { font-size: 10.5px; color: var(--dash-ink-muted); }
+
+.nb-review {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 10px;
+}
+
+/* The pop-up is fixed to the window, not the header, so it is seen
+   wherever the administrator has scrolled to. */
+.nb-popup {
+  position: fixed;
+  z-index: 60;
+  right: 20px;
+  bottom: 20px;
+  width: min(390px, calc(100vw - 32px));
+
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  padding: 12px 14px;
+
+  color: var(--dash-ink);
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line-strong);
+  border-left: 4px solid var(--dash-maroon);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(43, 10, 22, 0.28);
+
+  animation: nb-pop-in 0.26s ease-out;
+}
+
+.nb-popup-icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--dash-maroon);
+  background: #FBEFF4;
+  border-radius: 50%;
+}
+
+.nb-popup-text { display: grid; gap: 2px; min-width: 0; font-size: 12.5px; }
+.nb-popup-text strong { font-size: 13.5px; }
+.nb-popup-text span { color: var(--dash-ink-soft); overflow-wrap: anywhere; }
+
+.nb-popup-actions { display: flex; gap: 8px; }
+
+@keyframes nb-pop-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-bell.has-count,
+  .nb-popup { animation: none; }
+}
+
+@media (max-width: 980px) {
+  .pf-field select { min-width: 120px; }
+  .dashboard-welcome-inline { margin-left: 0; }
+}
+
+
+/* A header button a role cannot use is shown greyed rather than hidden,
+   with the reason in its tooltip. */
+.approvals-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+/* =====================================================================
+   PLACE PROFILE
+
+   The register card's view of one place: headline figures, the places
+   inside it as cards, then feeders, holdings and recent segments.
+   Scrolls inside the card, so the dashboard still fits one screen.
+   Classes prefixed pp-.
+   ===================================================================== */
+
+.register-mode { margin-right: 8px; }
+
+.pp {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 2px 2px 4px;
+}
+
+.pp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px 22px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, #FBEFF4 0%, #FFFDF6 70%);
+  border: 1px solid #F0D3DF;
+  border-radius: 10px;
+}
+
+.pp-title { display: grid; gap: 1px; min-width: 0; }
+
+.pp-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-ink-muted);
+}
+
+.pp-title h3 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 750;
+  color: var(--dash-maroon);
+}
+
+.pp-up { justify-self: start; font-size: 11.5px; }
+
+.pp-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0 0 0 auto;
+}
+
+.pp-figures > div { display: grid; gap: 1px; }
+
+.pp-figures dt {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dash-ink-muted);
+}
+
+.pp-figures dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-figures small,
+.pp-num small {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+}
+
+.pp-section h4 {
+  margin: 0 0 7px;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-maroon);
+}
+
+.pp-hint {
+  margin-left: 8px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dash-ink-muted);
+}
+
+.pp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 9px;
+}
+
+.pp-card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  font: inherit;
+  padding: 10px 12px;
+  color: var(--dash-ink);
+  background: #FFFFFF;
+  border: 1px solid var(--dash-line);
+  border-left: 4px solid var(--pp-accent);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.12s, border-color 0.15s;
+}
+
+.pp-card:hover {
+  border-color: var(--dash-line-strong);
+  border-left-color: var(--pp-accent);
+  box-shadow: 0 6px 18px rgba(43, 10, 22, 0.1);
+  transform: translateY(-1px);
+}
+
+.pp-card:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: 2px;
+}
+
+.pp-card-name { font-size: 13.5px; font-weight: 700; }
+
+.pp-card-name em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--dash-ink-muted);
+}
+
+.pp-card-figs { font-size: 12px; color: var(--dash-ink-soft); }
+.pp-card-figs strong { font-size: 15px; color: var(--dash-ink); }
+.pp-card-km { font-size: 11.5px; color: var(--dash-ink-soft); }
+
+.pp-bar {
+  height: 5px;
+  margin-top: 2px;
+  background: #F1E8EC;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pp-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--pp-accent);
+  border-radius: 999px;
+}
+
+.pp-card-share { font-size: 10.5px; color: var(--dash-ink-muted); }
+
+.pp-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.pp-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 9px;
+  font-size: 12px;
+  background: #FAF7F8;
+  border-radius: 7px;
+}
+
+.pp-list li.pp-measured { background: #F3F8F6; }
+
+.pp-strong { font-weight: 650; color: var(--dash-ink); }
+
+.pp-sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--dash-ink-muted);
+}
+
+.pp-num {
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-ink-soft);
+}
+
+.pp-empty,
+.pp-more {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--dash-ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-card { transition: none; }
+  .pp-card:hover { transform: none; }
+}
+
+@media (max-width: 1180px) {
+  .pp-columns { grid-template-columns: 1fr 1fr; }
+  .pp-figures { margin-left: 0; }
+}
+
+@media (max-width: 760px) {
+  .pp-columns { grid-template-columns: 1fr; }
+}
+
+
+/* =====================================================================
+   CLICKABLE TILES, TILE DETAILS, IMPORT PREVIEW
+   ===================================================================== */
+
+.card-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* A tile that opens its breakdown. Same look, plus a lift on hover and a
+   "Details" hint, so it reads as something to press. */
+.summary-card.is-clickable {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+
+.summary-card.is-clickable:hover {
+  box-shadow: 0 8px 22px rgba(43, 10, 22, 0.12);
+  transform: translateY(-1px);
+}
+
+.summary-card.is-clickable:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: 2px;
+}
+
+.summary-more {
+  float: right;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dash-maroon);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.summary-card.is-clickable:hover .summary-more,
+.summary-card.is-clickable:focus-visible .summary-more { opacity: 1; }
+
+.td-dialog { max-width: 880px; }
+.td-body { display: grid; gap: 14px; }
+
+.td-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.td-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-maroon);
+}
+
+.td-section h3 span {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dash-ink-muted);
+}
+
+.td-empty { margin: 0; font-size: 12.5px; color: var(--dash-ink-muted); }
+
+.td-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.td-bar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name  value'
+    'track track'
+    'share share';
+  gap: 3px 10px;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--dash-ink);
+  background: #FAF7F8;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.td-bar.is-clickable { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.td-bar.is-clickable:hover { background: #FFFFFF; border-color: var(--dash-line-strong); }
+.td-bar.is-clickable:focus-visible { outline: 2px solid var(--dash-maroon); outline-offset: 1px; }
+
+.td-bar-name { grid-area: name; font-size: 12.5px; font-weight: 650; }
+.td-bar-name em { margin-left: 6px; font-style: normal; font-weight: 500; font-size: 11px; color: var(--dash-ink-muted); }
+.td-bar-value { grid-area: value; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.td-bar-value small { font-size: 10px; font-weight: 600; color: var(--dash-ink-muted); }
+
+.td-bar-track {
+  grid-area: track;
+  height: 5px;
+  background: #EFE6EA;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.td-bar-track > span { display: block; height: 100%; border-radius: 999px; }
+.td-bar-share { grid-area: share; font-size: 10.5px; color: var(--dash-ink-muted); }
+
+.td-search { width: 100%; max-width: 420px; margin-bottom: 8px; }
+
+.td-units {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.td-unit {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  font: inherit;
+  text-align: left;
+  color: var(--dash-ink);
+  background: #FFFFFF;
+  border: 1px solid var(--dash-line);
+  border-left: 3px solid var(--dash-maroon);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.td-unit:hover { background: #FCF7F9; }
+.td-unit-main strong { font-size: 12.5px; }
+.td-unit-main em { margin-left: 6px; font-style: normal; font-size: 10.5px; color: var(--dash-ink-muted); }
+.td-unit-ids { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; font-weight: 600; color: var(--dash-ink-soft); font-variant-numeric: tabular-nums; }
+.td-unit-meta { font-size: 10.5px; color: var(--dash-ink-muted); }
+
+.td-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dash-ink-soft);
+}
+
+/* ------------------------------------------------ import preview */
+
+.import-banner {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+.import-banner.is-preview { background: #FFF6D6; border: 1px solid #EFD98A; color: #5C4600; }
+.import-banner.is-applied { background: #E8F7F0; border: 1px solid #B3E3CE; color: #145C3F; }
+
+.import-sheet { flex-wrap: wrap; }
+.import-sheet-note { flex-basis: 100%; font-size: 11px; color: var(--dash-ink-muted); }
+
+.import-changes li { display: grid; gap: 2px; }
+.import-change-who { font-size: 12px; }
+.import-change { font-size: 11.5px; color: var(--dash-ink-soft); padding-left: 10px; }
+.import-change del { color: #A11B3E; }
+.import-change ins { color: #1F7A4C; text-decoration: none; font-weight: 650; }
+
+.hv-register .depot-table-wrapper { max-height: 560px; }
+
+/* Short breakdowns (types, ratings) sit side by side so the list of
+   units below them stays in view. */
+.td-body > .td-section > .td-bars {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }

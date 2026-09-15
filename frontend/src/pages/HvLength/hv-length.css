@@ -1,0 +1,98 @@
+/* =====================================================================
+   HV LENGTH PAGE
+
+   Shares the dashboard's shell, cards and table by importing Dashbord.css
+   first; only what is specific to this page lives here.
+
+   The page is allowed to grow, unlike the dashboard, because a CSC or
+   feeder breakdown runs to seventeen or twenty-seven rows and squeezing
+   that into a fixed viewport would make the table scroll inside a box
+   instead of the page scrolling normally.
+   ===================================================================== */
+
+.hv-page {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  grid-template-rows: none;
+  padding-bottom: 26px;
+
+  /* Grid's default align-content behaves as stretch, so on a short page
+     the four auto rows grew to fill the viewport and left a band of dead
+     space inside every card. Pack them to the top instead. */
+  align-content: start;
+}
+
+/* One filter row above everything it scopes. */
+.hv-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+
+  padding: 12px 14px;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+}
+
+.hv-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.hv-filter > span {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-ink-muted);
+}
+
+.hv-filter select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--dash-ink);
+  padding: 7px 10px;
+  min-width: 165px;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 8px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.hv-filter select:focus {
+  outline: none;
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
+}
+
+/* Pushed to the far end so the controls read left to right as
+   "group by, narrow, then act". */
+.hv-filter-actions {
+  flex-direction: row;
+  gap: 8px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.hv-totals { grid-template-columns: repeat(5, 1fr); }
+
+.hv-page .dashboard-table-card { min-height: 320px; }
+
+.hv-page .depot-table-wrapper { max-height: none; }
+
+@media (max-width: 1180px) {
+  .hv-totals { grid-template-columns: repeat(3, 1fr); }
+  .hv-filter-actions { margin-left: 0; }
+}
+
+@media (max-width: 760px) {
+  .hv-totals { grid-template-columns: repeat(2, 1fr); }
+  .hv-filter select { min-width: 0; width: 100%; }
+  .hv-filter { flex: 1 1 100%; }
+}

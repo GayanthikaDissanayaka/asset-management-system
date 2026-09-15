@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { downloadFromApi, uploadSpreadsheet } from './fileTransfer';
 import { describeWriteError } from './session';
 import { formatNumber } from './data';
+import TransformerImportResult from './TransformerImportResult';
 
 /**
  * Loading a spreadsheet of segments.
@@ -56,16 +57,21 @@ const ImportDialog = ({ open, onClose, onImported }) => {
     }
   };
 
-  const submit = async () => {
+  const submit = async (confirm = false) => {
     if (!file) return;
     setBusy(true);
     setError('');
     setResult(null);
 
     try {
-      const data = await uploadSpreadsheet(file);
+      const data = await uploadSpreadsheet(file, { confirm });
       setResult(data);
-      if (data.created > 0) onImported(data.message);
+
+      const changed =
+        data.kind === 'transformers'
+          ? data.applied && (data.created > 0 || data.updated > 0)
+          : data.created > 0;
+      if (changed) onImported(data.message);
     } catch (err) {
       // A rejected file still carries a useful body, including the
       // "turn on the zip extension" case.
@@ -91,8 +97,11 @@ const ImportDialog = ({ open, onClose, onImported }) => {
       <div className="dialog dialog-narrow" role="dialog" aria-modal="true" aria-labelledby="import-title">
         <header className="dialog-head">
           <div>
-            <h2 id="import-title">Import segments</h2>
-            <p>Load a sheet of segments into the register.</p>
+            <h2 id="import-title">Import a spreadsheet</h2>
+            <p>
+              Segment sheets or transformer workbooks — the columns are recognised,
+              and anything else in the file is ignored.
+            </p>
           </div>
           <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
             &times;
@@ -109,10 +118,10 @@ const ImportDialog = ({ open, onClose, onImported }) => {
             </div>
 
             <div className="import-actions">
-              <button type="button" className="btn-quiet btn-sm" onClick={() => getTemplate('xlsx')}>
+              <button type="button" className="dash-btn-quiet dash-btn-sm" onClick={() => getTemplate('xlsx')}>
                 Download .xlsx
               </button>
-              <button type="button" className="btn-quiet btn-sm" onClick={() => getTemplate('csv')}>
+              <button type="button" className="dash-btn-quiet dash-btn-sm" onClick={() => getTemplate('csv')}>
                 Download .csv
               </button>
             </div>
@@ -151,7 +160,9 @@ const ImportDialog = ({ open, onClose, onImported }) => {
 
           {error && <div className="dialog-error">{error}</div>}
 
-          {result && (
+          {result?.kind === 'transformers' && <TransformerImportResult result={result} />}
+
+          {result && result.kind !== 'transformers' && (
             <div className="import-result">
               <div className="import-tallies">
                 <span className="import-tally is-good">
@@ -164,6 +175,87 @@ const ImportDialog = ({ open, onClose, onImported }) => {
                   <strong>{formatNumber(result.errors?.length || 0)}</strong> errors
                 </span>
               </div>
+
+              {/* Where the sheet was filed.
+                  This is the part worth reading after an import: the
+                  place names in the sheet are rarely the CSC codes, so
+                  "loaded 400 rows" means nothing until you can see what
+                  each name was taken to mean. Rows matched by alias or
+                  by spelling are marked, because those are the ones a
+                  person would want to check. */}
+              {/* How the file was read: which heading became which field,
+                  which became asset quantities, and what was ignored.
+                  Without this, a column that was meant to load and did
+                  not would vanish without a word. */}
+              {result.columns && (
+                <>
+                  <h4>How the file was read</h4>
+                  <p className="import-hint">
+                    Sheet &ldquo;{result.columns.sheet}&rdquo;, headings found on row{' '}
+                    {result.columns.header_row}.
+                  </p>
+                  <ul className="import-list import-places">
+                    {[...(result.columns.used || []), ...(result.columns.assets || [])].map(
+                      (c) => (
+                        <li key={`${c.heading}-${c.read_as}`}>
+                          <span className="import-place-given">{c.heading}</span>
+                          <span className="import-place-arrow" aria-hidden="true">→</span>
+                          <span className="import-place-to">{c.read_as}</span>
+                        </li>
+                      )
+                    )}
+                  </ul>
+                  {result.columns.ignored?.length > 0 && (
+                    <p className="import-hint">
+                      Ignored, not needed: {result.columns.ignored.join(', ')}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {result.places?.length > 0 && (
+                <>
+                  <h4>Where it was filed</h4>
+                  <ul className="import-list import-places">
+                    {result.places.map((p, i) => (
+                      <li key={`${p.given}-${i}`} className={p.ok ? undefined : 'is-bad'}>
+                        <span className="import-place-given">{p.given}</span>
+                        <span className="import-place-arrow" aria-hidden="true">→</span>
+                        {p.ok ? (
+                          <>
+                            <span className="import-place-to">{p.assigned_to}</span>
+                            {(p.matched_by === 'alias' || p.matched_by === 'fuzzy') && (
+                              <em className="import-place-flag">
+                                {p.matched_by === 'alias' ? 'by alias' : 'by spelling'}
+                              </em>
+                            )}
+                            <span className="import-place-rows">
+                              {formatNumber(p.rows)} row{p.rows === 1 ? '' : 's'}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="import-place-to">{p.message}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {/* Loaded, but worth a look: an unknown feeder, a voltage
+                  that could not be read. */}
+              {result.warnings?.length > 0 && (
+                <>
+                  <h4>Loaded with a note</h4>
+                  <ul className="import-list">
+                    {result.warnings.slice(0, 12).map((w, i) => (
+                      <li key={`w-${w.row}-${i}`}>
+                        Row {w.row}: {w.message}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
               {result.skipped?.length > 0 && (
                 <>
@@ -203,19 +295,34 @@ const ImportDialog = ({ open, onClose, onImported }) => {
         </div>
 
         <footer className="dialog-foot">
-          <button type="button" className="btn-quiet" onClick={onClose} disabled={busy}>
-            {result?.created > 0 ? 'Done' : 'Cancel'}
+          <button type="button" className="dash-btn-quiet" onClick={onClose} disabled={busy}>
+            {result?.created > 0 || result?.applied ? 'Done' : 'Cancel'}
           </button>
 
           <div className="dialog-foot-right">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={submit}
-              disabled={!file || busy}
-            >
-              {busy ? 'Loading...' : 'Load into register'}
-            </button>
+            {result?.kind === 'transformers' &&
+            result.preview &&
+            result.counts.new + result.counts.updated > 0 ? (
+              <button
+                type="button"
+                className="dash-btn-primary"
+                onClick={() => submit(true)}
+                disabled={busy}
+              >
+                {busy
+                  ? 'Applying...'
+                  : `Apply: add ${result.counts.new}, update ${result.counts.updated}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="dash-btn-primary"
+                onClick={() => submit(false)}
+                disabled={!file || busy || result?.applied}
+              >
+                {busy ? 'Reading the file...' : 'Upload'}
+              </button>
+            )}
           </div>
         </footer>
       </div>

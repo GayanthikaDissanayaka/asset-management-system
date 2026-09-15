@@ -25,6 +25,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureRole
 {
+    /** Holds every permission, on every route, without being listed. */
+    private const FULL_ACCESS_ROLE = 'ADMIN';
+
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
@@ -42,6 +45,17 @@ class EnsureRole
         }
 
         $code = $user->role?->role_code;
+
+        /*
+         * An administrator passes every role check, whether or not ADMIN
+         * was named on the route. Otherwise adding a route gated
+         * `role:ENGINEER` would silently lock out the one person who is
+         * supposed to be able to do everything, and each new gate would
+         * have to remember to list ADMIN again.
+         */
+        if ($code === self::FULL_ACCESS_ROLE) {
+            return $next($request);
+        }
 
         if (! $code || ! in_array($code, $roles, true)) {
             return response()->json([

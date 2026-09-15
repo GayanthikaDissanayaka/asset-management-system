@@ -1,0 +1,13 @@
+
+# The React build, copied in by `php artisan app:deploy-frontend`.
+#
+# These are generated artefacts, not source. Committing them puts a
+# ~740 KB bundle in every diff and guarantees merge conflicts on files
+# nobody edits by hand. Rebuild them instead:
+#
+#   php artisan app:deploy-frontend --build
+#
+# index.php and .htaccess are Laravel's own and stay tracked.
+/public/index.html
+/public/asset-manifest.json
+/public/static/

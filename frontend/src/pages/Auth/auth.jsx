@@ -368,9 +368,31 @@ export function Login() {
       if (data.user) store.setItem('ceb_user', JSON.stringify(data.user));
 
       toast.success(
-        'Signed in',
-        data.user?.full_name ? `Welcome back, ${data.user.full_name}.` : 'Loading your dashboard.'
+        'Welcome to the CEB Asset Management System',
+        data.user?.full_name
+          ? `Signed in as ${data.user.full_name}.`
+          : 'Loading your dashboard.'
       );
+
+      /* The same greeting is handed to the dashboard to show on arrival.
+         This toast is only on screen for half a second before the page
+         navigates away, which is not long enough to read a welcome --
+         and a message nobody can read is not a welcome. sessionStorage
+         rather than router state so it survives the redirect and a
+         refresh, and is read once and cleared. */
+      try {
+        sessionStorage.setItem(
+          'ceb_welcome',
+          JSON.stringify({
+            name: data.user?.full_name || '',
+            at: Date.now(),
+          })
+        );
+      } catch {
+        // Private windows refuse storage; the dashboard simply opens
+        // without a greeting, which is not worth failing the sign-in for.
+      }
+
       setTimeout(() => navigate('/dashboard', { replace: true }), 500);
     } catch (err) {
       const status = err.response?.status;
@@ -462,15 +484,35 @@ export function Register() {
   const toast = useToasts();
 
   const [form, setForm] = useState({
-    fullName: '', email: '', phone: '', password: '', confirmPassword: '',
+    fullName: '', designation: '',
+    email: '', phone: '',
+    areaId: '', requestedRole: '',
+    password: '', confirmPassword: '',
   });
+  const [options, setOptions] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
+  /* Areas, CSCs and the roles that may be asked for. A failure here is
+     not fatal: those three fields are optional, and the account can still
+     be created without them. */
+  useEffect(() => {
+    let cancelled = false;
+    axiosClient
+      .get('/auth/registration-options')
+      .then(({ data }) => { if (!cancelled) setOptions(data); })
+      .catch(() => { if (!cancelled) setOptions({ areas: [], cscs: [], roles: [] }); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const areas = options?.areas || [];
+  const roles = options?.roles || [];
+
   const change = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
   const submit = async (e) => {
@@ -506,27 +548,32 @@ export function Register() {
         email: form.email.trim().toLowerCase(),
         phone,
         password: form.password,
+        designation: form.designation.trim() || null,
+        area_id: form.areaId ? Number(form.areaId) : null,
+        requested_role: form.requestedRole || null,
       });
 
       const token = data.token || data.accessToken;
       if (token) {
         localStorage.setItem('ceb_token', token);
         if (data.user) localStorage.setItem('ceb_user', JSON.stringify(data.user));
-        toast.success('Account created', 'Signing you in now.');
-        setTimeout(() => navigate('/dashboard', { replace: true }), 600);
+        toast.success('Request sent', data.message || 'Signing you in now.');
+        setTimeout(() => navigate('/dashboard', { replace: true }), 900);
       } else {
         navigate('/login', {
           replace: true,
-          state: { message: 'Account created. Please sign in.' },
+          state: { message: data.message || 'Account created. Please sign in.' },
         });
       }
     } catch (err) {
       const status = err.response?.status;
+      const fieldErrors = err.response?.data?.errors;
+
       if (status === 409) {
         setErrors({ email: 'An account with this email already exists.' });
         toast.error('Email already registered', 'Try signing in, or reset your password.');
-      } else if (status === 422 && err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+      } else if (status === 422 && fieldErrors) {
+        setErrors(fieldErrors);
         toast.error('Check the form', 'The server rejected some of these details.');
       } else {
         reportError(err, toast, 'Could not create the account');
@@ -536,83 +583,140 @@ export function Register() {
     }
   };
 
+  const chosenRole = roles.find((r) => r.role_code === form.requestedRole);
+
   return (
     <div className="auth-shell">
       <ToastStack toasts={toast.toasts} onDismiss={toast.dismiss} />
 
       <AuthAside
-        title="Create your account"
-        body="New accounts start with read access to dashboards and reports. An administrator assigns your role and depot before you can record or edit asset data."
+        title="Request an account"
+        body="Tell us who you are and where you work. Every new account starts read-only, and an administrator assigns your role and depot before you can record or edit asset data."
         points={[
-          'View province, area and depot totals',
-          'Browse the asset and transformer register',
-          'Request edit access from your administrator',
+          'Read access to dashboards and reports straight away',
+          'Your request goes to an administrator for approval',
+          'Editing opens once your role and depot are assigned',
         ]}
       />
 
       <main className="auth-main">
-        <div className="auth-card">
+        {/* Compact so the whole request fits one screen without scrolling:
+            every field is paired, and the hints sit in placeholders. */}
+        <div className="auth-card auth-card-wide auth-card-compact">
           <Link to="/" className="auth-back">&larr; Back to home</Link>
-          <h1>Create an account</h1>
-          <p className="sub">It takes about a minute.</p>
+          <h1>Request an account</h1>
+          <p className="sub">Read-only until an administrator assigns your role.</p>
 
           <form onSubmit={submit} noValidate>
-            <div className="field">
-              <label htmlFor="fullName">Full name</label>
-              <input id="fullName" name="fullName" type="text" autoComplete="name"
-                     placeholder="K. Jayasekara" value={form.fullName} onChange={change}
-                     className={errors.fullName ? 'invalid' : ''} />
-              {errors.fullName && <span className="field-error">{errors.fullName}</span>}
-            </div>
 
-            <div className="field">
-              <label htmlFor="reg-email">Email address</label>
-              <input id="reg-email" name="email" type="email" autoComplete="email"
-                     placeholder="name@edl.lk" value={form.email} onChange={change}
-                     className={errors.email ? 'invalid' : ''} />
-              {errors.email
-                ? <span className="field-error">{errors.email}</span>
-                : <span className="hint">Used to sign in and to reset your password.</span>}
-            </div>
+            <fieldset className="form-section">
+              <legend>Who you are</legend>
 
-            <div className="field">
-              <label htmlFor="phone">Phone number</label>
-              <input id="phone" name="phone" type="tel" autoComplete="tel"
-                     placeholder="0712345678" value={form.phone} onChange={change}
-                     className={errors.phone ? 'invalid' : ''} />
-              {errors.phone && <span className="field-error">{errors.phone}</span>}
-            </div>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="fullName">Full name *</label>
+                  <input id="fullName" name="fullName" type="text" autoComplete="name"
+                         placeholder="K. Jayasekara" value={form.fullName} onChange={change}
+                         className={errors.fullName ? 'invalid' : ''} />
+                  {errors.fullName && <span className="field-error">{errors.fullName}</span>}
+                </div>
 
-            <div className="field">
-              <label htmlFor="reg-password">Password</label>
-              <div className="password-wrap">
-                <input id="reg-password" name="password"
-                       type={showPassword ? 'text' : 'password'}
-                       autoComplete="new-password" placeholder="At least 10 characters"
-                       value={form.password} onChange={change}
-                       className={errors.password ? 'invalid' : ''} />
-                <button type="button" className="password-toggle"
-                        onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+                <div className="field">
+                  <label htmlFor="designation">Designation</label>
+                  <input id="designation" name="designation" type="text"
+                         placeholder="Electrical Superintendent" value={form.designation}
+                         onChange={change} />
+                </div>
               </div>
-              <PasswordStrength value={form.password} />
-              {errors.password && <span className="field-error">{errors.password}</span>}
-            </div>
 
-            <div className="field">
-              <label htmlFor="confirmPassword">Confirm password</label>
-              <input id="confirmPassword" name="confirmPassword"
-                     type={showPassword ? 'text' : 'password'}
-                     autoComplete="new-password" placeholder="Type it again"
-                     value={form.confirmPassword} onChange={change}
-                     className={errors.confirmPassword ? 'invalid' : ''} />
-              {errors.confirmPassword && (
-                <span className="field-error">{errors.confirmPassword}</span>
-              )}
-            </div>
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="reg-email">Email address *</label>
+                  <input id="reg-email" name="email" type="email" autoComplete="email"
+                         placeholder="name@edl.lk" value={form.email} onChange={change}
+                         className={errors.email ? 'invalid' : ''} />
+                  {errors.email && <span className="field-error">{errors.email}</span>}
+                </div>
 
-            <SubmitButton loading={submitting} idle="Create account" busy="Creating account" />
+                <div className="field">
+                  <label htmlFor="phone">Phone number *</label>
+                  <input id="phone" name="phone" type="tel" autoComplete="tel"
+                         placeholder="0712345678" value={form.phone} onChange={change}
+                         className={errors.phone ? 'invalid' : ''} />
+                  {errors.phone && <span className="field-error">{errors.phone}</span>}
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Where you work</legend>
+
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="areaId">Area</label>
+                  <select id="areaId" name="areaId" value={form.areaId} onChange={change}
+                          className={errors.areaId ? 'invalid' : ''}>
+                    <option value="">Not sure yet</option>
+                    {areas.map((a) => (
+                      <option key={a.area_id} value={a.area_id}>
+                        {a.area_name} ({a.area_code})
+                      </option>
+                    ))}
+                  </select>
+                  {errors.areaId && <span className="field-error">{errors.areaId}</span>}
+                </div>
+
+                <div className="field">
+                  <label htmlFor="requestedRole">Access you need</label>
+                  <select id="requestedRole" name="requestedRole"
+                          value={form.requestedRole} onChange={change}>
+                    <option value="">Read only is fine</option>
+                    {roles.map((r) => (
+                      <option key={r.role_id} value={r.role_code}>{r.role_name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {chosenRole && <span className="hint">{chosenRole.description}</span>}
+            </fieldset>
+
+            <fieldset className="form-section">
+              <legend>Choose a password</legend>
+
+              <div className="field-row">
+                <div className="field">
+                  <label htmlFor="reg-password">Password *</label>
+                  <div className="password-wrap">
+                    <input id="reg-password" name="password"
+                           type={showPassword ? 'text' : 'password'}
+                           autoComplete="new-password" placeholder="At least 10 characters"
+                           value={form.password} onChange={change}
+                           className={errors.password ? 'invalid' : ''} />
+                    <button type="button" className="password-toggle"
+                            onClick={() => setShowPassword(!showPassword)}>
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <PasswordStrength value={form.password} />
+                  {errors.password && <span className="field-error">{errors.password}</span>}
+                </div>
+
+                <div className="field">
+                  <label htmlFor="confirmPassword">Confirm password *</label>
+                  <input id="confirmPassword" name="confirmPassword"
+                         type={showPassword ? 'text' : 'password'}
+                         autoComplete="new-password" placeholder="Type it again"
+                         value={form.confirmPassword} onChange={change}
+                         className={errors.confirmPassword ? 'invalid' : ''} />
+                  {errors.confirmPassword && (
+                    <span className="field-error">{errors.confirmPassword}</span>
+                  )}
+                </div>
+              </div>
+            </fieldset>
+
+            <SubmitButton loading={submitting} idle="Send request" busy="Sending request" />
           </form>
 
           <p className="auth-alt">
@@ -623,6 +727,8 @@ export function Register() {
     </div>
   );
 }
+
+
 
 
 /* =====================================================================

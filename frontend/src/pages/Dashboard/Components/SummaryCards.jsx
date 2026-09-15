@@ -19,69 +19,111 @@ import { toArray, num, pick, formatNumber, readUnits, readKva } from './data';
  * was showing. Network length is reported here on its own, in km, and
  * nothing adds it to a count.
  */
-const SummaryCards = ({ areaTotals, cscSummary }) => {
+const SummaryCards = ({ cscSummary, lineLengths, scopeLabel, onOpen }) => {
   const stats = useMemo(() => {
-    const areaRows = toArray(areaTotals);
     const cscRows = toArray(cscSummary);
+    const lengthRows = toArray(lineLengths);
 
     return {
-      transformers: areaRows.reduce((sum, r) => sum + readUnits(r), 0),
-      installedKva: areaRows.reduce((sum, r) => sum + readKva(r), 0),
-      areaCount: areaRows.length,
-      cscCount: cscRows.length,
-      cscsWithTransformers: cscRows.filter((r) => readUnits(r) > 0).length,
-      networkKm: cscRows.reduce(
-        (sum, r) => sum + num(pick(r, 'network_km', 'networkKm')),
+      /*
+       * HV line, from v_line_length_by_area — the working segment
+       * register, 3,441 km across all seventeen CSCs.
+       *
+       * NOT v_depot_dashboard.network_km, which is the ASSET register's
+       * line and is piloted in two CSCs. That is what this tile used to
+       * read, so the front page announced 16.3 km while the HV Length
+       * page in the same application said 3,441.31 km. Both numbers were
+       * correct about different things, which is exactly what makes a
+       * headline figure misleading: nobody reads a tile labelled
+       * "Network" as "the part of the network in two CSCs".
+       */
+      hvLengthKm: lengthRows.reduce(
+        (sum, r) => sum + num(pick(r, 'total_km', 'totalKm')),
         0
       ),
-      cscsMapped: cscRows.filter(
-        (r) => num(pick(r, 'network_km', 'networkKm')) > 0
-      ).length,
+      hvSegments: lengthRows.reduce(
+        (sum, r) => sum + num(pick(r, 'segment_count', 'segmentCount')),
+        0
+      ),
+
+      /* Counted from the per-CSC rows, not the per-area ones, so the
+         tiles can be narrowed to a single CSC as well as to an area.
+         Both add up to the same 1,711 units and 312,230 kVA. */
+      transformers: cscRows.reduce((sum, r) => sum + readUnits(r), 0),
+      installedKva: cscRows.reduce((sum, r) => sum + readKva(r), 0),
+      areaCount: new Set(cscRows.map((r) => pick(r, 'area_id', 'areaId'))).size,
+      cscCount: cscRows.length,
+      cscsWithTransformers: cscRows.filter((r) => readUnits(r) > 0).length,
     };
-  }, [areaTotals, cscSummary]);
+  }, [cscSummary, lineLengths]);
 
   const cards = [
     {
+      kind: 'transformers',
       label: 'Transformers',
       value: formatNumber(stats.transformers),
       hint: `Recorded in ${stats.cscsWithTransformers} of ${stats.cscCount} CSCs`,
       accent: 'accent-1',
     },
     {
+      kind: 'kva',
       label: 'Installed kVA',
       value: formatNumber(stats.installedKva),
       hint: 'Nameplate capacity across the fleet',
       accent: 'accent-2',
     },
     {
+      kind: 'cscs',
       label: 'CSCs',
       value: formatNumber(stats.cscCount),
-      hint: 'Consumer service centres in the province',
+      hint: scopeLabel ? `In ${scopeLabel}` : 'Consumer service centres in the province',
       accent: 'accent-3',
     },
     {
+      kind: 'areas',
       label: 'Areas',
       value: formatNumber(stats.areaCount),
-      hint: 'Operational areas in Uva Province',
+      hint: scopeLabel ? `In ${scopeLabel}` : 'Operational areas in Uva Province',
       accent: 'accent-4',
     },
     {
-      label: 'Network Mapped',
-      value: `${formatNumber(stats.networkKm, 1)} km`,
-      hint: `Asset register piloted in ${stats.cscsMapped} CSCs`,
+      kind: 'hv',
+      label: 'HV Line',
+      value: `${formatNumber(stats.hvLengthKm, 2)} km`,
+      hint: scopeLabel
+        ? `Across ${formatNumber(stats.hvSegments)} segments in ${scopeLabel}`
+        : `Across ${formatNumber(stats.hvSegments)} segments in all ${stats.cscCount} CSCs`,
       accent: 'accent-5',
     },
   ];
 
   return (
     <div className="summary-cards">
-      {cards.map((card) => (
-        <div className={`summary-card ${card.accent}`} key={card.label}>
-          <span className="summary-label">{card.label}</span>
-          <span className="summary-value">{card.value}</span>
-          <span className="summary-hint">{card.hint}</span>
-        </div>
-      ))}
+      {/* Each tile opens the breakdown it was added up from. */}
+      {cards.map((card) =>
+        onOpen ? (
+          <button
+            type="button"
+            className={`summary-card is-clickable ${card.accent}`}
+            key={card.label}
+            onClick={() => onOpen(card.kind)}
+            title={`${card.label}: see the breakdown`}
+          >
+            <span className="summary-label">
+              {card.label}
+              <span className="summary-more" aria-hidden="true">Details &rarr;</span>
+            </span>
+            <span className="summary-value">{card.value}</span>
+            <span className="summary-hint">{card.hint}</span>
+          </button>
+        ) : (
+          <div className={`summary-card ${card.accent}`} key={card.label}>
+            <span className="summary-label">{card.label}</span>
+            <span className="summary-value">{card.value}</span>
+            <span className="summary-hint">{card.hint}</span>
+          </div>
+        )
+      )}
     </div>
   );
 };

@@ -49,6 +49,130 @@ class NetworkController extends Controller
         );
     }
 
+    /**
+     * HV line length, grouped at whichever level is asked for.
+     *
+     * Reads v_segment_csc_share rather than segment_register directly, so
+     * a segment crossing a CSC boundary contributes only its own portion
+     * to each CSC and to each area. That is the whole reason the share
+     * view exists, and it is why province, area and CSC totals here add
+     * up to the same number instead of drifting apart.
+     *
+     * The filters narrow the same query rather than switching to a
+     * different one, so a figure never changes meaning depending on which
+     * combination is selected.
+     */
+    public function hvLength(Request $request)
+    {
+        $v = $request->validate([
+            'level'   => ['nullable', Rule::in(['province', 'area', 'csc', 'feeder'])],
+            'area_id' => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
+            'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'province_id')],
+            'csc_id'  => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'voltage' => ['nullable', Rule::in(['33kV', '11kV', '400V'])],
+        ]);
+
+        $level = $v['level'] ?? 'area';
+
+        $base = fn () => DB::table('v_segment_csc_share as s')
+            ->join('segment_register as sr', 'sr.register_id', '=', 's.register_id')
+            ->join('csc_depots as d', 'd.csc_id', '=', 's.csc_id')
+            ->join('areas as a', 'a.area_id', '=', 'd.area_id')
+            ->leftJoin('feeders as f', 'f.feeder_id', '=', 'sr.feeder_id')
+            ->when(
+                $v['area_id'] ?? null,
+                fn ($q, $id) => $q->where('a.area_id', $id)
+            )
+            ->when(
+                $v['csc_id'] ?? null,
+                fn ($q, $id) => $q->where('d.csc_id', $id)
+            )
+            ->when(
+                $v['province_id'] ?? null,
+                fn ($q, $id) => $q->where('a.province_id', $id)
+            )
+            ->when(
+                $v['voltage'] ?? null,
+                fn ($q, $volt) => $q->where('sr.voltage_level', $volt)
+            );
+
+        $grouping = [
+            'province' => [
+                ['a.province_id as group_id', 'p.province_name as group_name', 'p.province_name as group_code'],
+                ['a.province_id', 'p.province_name'],
+            ],
+            'area' => [
+                ['a.area_id as group_id', 'a.area_name as group_name', 'a.area_code as group_code'],
+                ['a.area_id', 'a.area_name', 'a.area_code'],
+            ],
+            'csc' => [
+                ['d.csc_id as group_id', 'd.csc_name as group_name', 'd.csc_code as group_code'],
+                ['d.csc_id', 'd.csc_name', 'd.csc_code'],
+            ],
+            'feeder' => [
+                ['f.feeder_id as group_id', 'f.feeder_name as group_name', 'f.feeder_code as group_code'],
+                ['f.feeder_id', 'f.feeder_name', 'f.feeder_code'],
+            ],
+        ];
+
+        [$select, $groupBy] = $grouping[$level];
+
+        $query = $base();
+
+        if ($level === 'province') {
+            $query->join('provinces as p', 'p.province_id', '=', 'a.province_id');
+        }
+
+        $rows = $query
+            ->selectRaw(implode(', ', $select))
+            ->selectRaw('COUNT(*) as segment_count')
+            ->selectRaw('COALESCE(SUM(s.is_split), 0) as crossing_count')
+            ->selectRaw('COUNT(DISTINCT d.csc_id) as csc_count')
+            ->selectRaw('COUNT(DISTINCT sr.feeder_id) as feeder_count')
+            ->selectRaw('COALESCE(SUM(s.length_km), 0) as total_km')
+            ->selectRaw('ROUND(COALESCE(AVG(s.length_km), 0), 3) as mean_km')
+            ->selectRaw('COALESCE(MAX(s.length_km), 0) as longest_km')
+            ->groupByRaw(implode(', ', $groupBy))
+            ->orderByDesc('total_km')
+            ->get();
+
+        // Totals come from the same filtered set, so the footer always
+        // matches the rows above it.
+        $totals = $base()
+            ->selectRaw('COUNT(*) as segment_count')
+            ->selectRaw('COUNT(DISTINCT s.register_id) as distinct_segments')
+            ->selectRaw('COALESCE(SUM(s.is_split), 0) as crossing_count')
+            ->selectRaw('COUNT(DISTINCT d.csc_id) as csc_count')
+            ->selectRaw('COUNT(DISTINCT a.area_id) as area_count')
+            ->selectRaw('COUNT(DISTINCT sr.feeder_id) as feeder_count')
+            ->selectRaw('COALESCE(SUM(s.length_km), 0) as total_km')
+            ->first();
+
+        return response()->json([
+            'level'   => $level,
+            'filters' => [
+                'area_id' => $v['area_id'] ?? null,
+                'csc_id'  => $v['csc_id'] ?? null,
+                'voltage' => $v['voltage'] ?? null,
+            ],
+            'totals'  => $totals,
+            'rows'    => $rows,
+        ]);
+    }
+
+    /** Voltage levels actually present in the register, for the filter. */
+    public function voltageLevels()
+    {
+        return response()->json(
+            DB::table('segment_register')
+                ->where('status', 'ACTIVE')
+                ->select('voltage_level')
+                ->distinct()
+                ->orderBy('voltage_level')
+                ->pluck('voltage_level')
+        );
+    }
+
     /** Province totals per asset type, gathered from every placement route. */
     public function assetTotals()
     {
