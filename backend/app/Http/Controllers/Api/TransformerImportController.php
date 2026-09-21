@@ -7,6 +7,7 @@ use App\Support\PlaceResolver;
 use App\Support\TransformerSheetReader as Reader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\IdSequence;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 /**
@@ -212,7 +213,7 @@ class TransformerImportController extends Controller
                     $rowCsc = $cell($raw, 'csc');
                     if ($rowCsc !== '') {
                         $hit = $places->resolve($rowCsc, $cell($raw, 'area'));
-                        if ($hit['ok'] && (int) $hit['csc_id'] !== (int) $match->csc_id) {
+                        if ($hit['ok'] && (string) $hit['csc_id'] !== (string) $match->csc_id) {
                             $warnings[] = $this->note($sheet, $lineNo,
                                 "{$label} is recorded in {$cscNames[$match->csc_id]->csc_name} CSC but the file says {$hit['csc']->csc_name}; it was not moved.");
                         }
@@ -244,7 +245,7 @@ class TransformerImportController extends Controller
                     }
 
                     $updates[] = [
-                        'id'      => (int) $match->transformer_id,
+                        'id'      => (string) $match->transformer_id,
                         'sheet'   => $sheet['sheet'],
                         'row'     => $lineNo,
                         'label'   => $label,
@@ -349,13 +350,14 @@ class TransformerImportController extends Controller
 
     /* ============================== WRITE ============================= */
 
-    private function write(array $new, array $updates, ?int $userId): void
+    private function write(array $new, array $updates, ?string $userId): void
     {
         DB::transaction(function () use ($new, $updates) {
             foreach ($new as $n) {
                 $v = $n['values'];
 
                 DB::table('transformers')->insert([
+                        'transformer_id'   => IdSequence::next('transformers'),
                     'csc_id'                 => $n['csc_id'],
                     'asset_type_id'          => $n['type_id'],
                     'old_sin_no'             => isset($v['old_sin_no']) ? mb_substr($v['old_sin_no'], 0, 40) : null,
@@ -402,12 +404,12 @@ class TransformerImportController extends Controller
         if ($csc !== '') {
             $hit = $places->resolve($csc, $area);
             if ($hit['ok']) {
-                return [(int) $hit['csc_id'], 'CSC column'];
+                return [(string) $hit['csc_id'], 'CSC column'];
             }
         }
 
         if ($sheetPlace['ok']) {
-            return [(int) $sheetPlace['csc_id'], 'sheet name'];
+            return [(string) $sheetPlace['csc_id'], 'sheet name'];
         }
 
         foreach (['old_sin_no', 'new_sin_no'] as $c) {

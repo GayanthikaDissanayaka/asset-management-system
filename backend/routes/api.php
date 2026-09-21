@@ -48,7 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead'])
-        ->whereNumber('notification');
+        ->where('notification', '[A-Za-z]{2,5}-\d+');   // NTF-00001
 
     // Hierarchy (read-mostly reference data)
     Route::apiResource('areas', AreaController::class)->only(['index', 'show']);
@@ -66,6 +66,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Dashboard roll-ups (depot -> area -> province)
     Route::prefix('dashboard')->group(function () {
+        // Everything the dashboard needs on first paint, in one response.
+        // The individual routes below still work and still return the
+        // same shapes; this only saves the page six round trips.
+        Route::get('bootstrap', [DashboardController::class, 'bootstrap']);
+
         Route::get('depot-summary', [DashboardController::class, 'depotAssetSummary']);
         Route::get('depot-totals', [DashboardController::class, 'depotTotals']);
         Route::get('area-totals', [DashboardController::class, 'areaTotals']);
@@ -113,7 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // The units in a place, with serial numbers, for the Transformers tile.
         Route::get('transformers', [AssetExplorerController::class, 'listTransformers']);
         Route::get('transformers/{transformer}', [AssetExplorerController::class, 'showTransformer'])
-            ->whereNumber('transformer');
+            ->where('transformer', '[A-Za-z]{2,5}-\d+');   // TRF-02113
 
         // Excel out
         Route::get('report', [SpreadsheetController::class, 'report']);

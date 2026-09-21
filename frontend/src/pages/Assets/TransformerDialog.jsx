@@ -205,7 +205,7 @@ const TransformerDialog = ({ transformerId, onClose }) => {
                       </thead>
                       <tbody>
                         {segments.map((s) => (
-                          <tr key={s.register_id}>
+                          <tr key={s.segment_register_id}>
                             <td>
                               <span className="depot-name">{s.segment_code}</span>
                             </td>

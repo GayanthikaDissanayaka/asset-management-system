@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\IdSequence;
 use Illuminate\Validation\Rule;
 
 /**
@@ -157,7 +158,7 @@ class AssetExplorerController extends Controller
                 $agg   = $perCategory[$categoryId] ?? null;
 
                 return [
-                    'category_id'   => (int) $categoryId,
+                    'category_id'   => (string) $categoryId,
                     'category_name' => $first->category_name,
                     'order'         => (int) $first->category_order,
                     'records'       => (int) $types->sum('records'),
@@ -184,7 +185,7 @@ class AssetExplorerController extends Controller
                     'types' => $types
                         ->sortBy([['type_order', 'asc'], ['type_name', 'asc']])
                         ->map(fn ($t) => [
-                            'asset_type_id'   => (int) $t->asset_type_id,
+                            'asset_type_id'   => (string) $t->asset_type_id,
                             'type_code'       => $t->type_code,
                             'type_name'       => $t->type_name,
                             'unit_of_measure' => $t->unit_of_measure,
@@ -418,7 +419,7 @@ class AssetExplorerController extends Controller
                 $h = $held[$t->asset_type_id] ?? null;
 
                 return [
-                    'asset_type_id'   => (int) $t->asset_type_id,
+                    'asset_type_id'   => (string) $t->asset_type_id,
                     'type_code'       => $t->type_code,
                     'type_name'       => $t->type_name,
                     'unit_of_measure' => $t->unit_of_measure,
@@ -426,7 +427,7 @@ class AssetExplorerController extends Controller
                     'allow_decimal'   => (bool) $t->allow_decimal,
                     'rated_kva'       => $t->rated_kva !== null ? (int) $t->rated_kva : null,
                     'is_active'       => (bool) $t->is_active,
-                    'category_id'     => (int) $t->category_id,
+                    'category_id'     => (string) $t->category_id,
                     'category_code'   => $t->category_code,
                     'category_name'   => $t->category_name,
 
@@ -468,9 +469,9 @@ class AssetExplorerController extends Controller
     public function used(Request $request)
     {
         $validated = $request->validate([
-            'csc_id'        => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
-            'area_id'       => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'asset_type_id' => ['nullable', 'integer', Rule::exists('asset_types', 'asset_type_id')],
+            'csc_id'        => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
+            'area_id'       => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'asset_type_id' => ['nullable', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
             'batch_ref'     => ['nullable', 'string', 'size:32'],
             'limit'         => ['nullable', 'integer', 'min:1', 'max:500'],
             'page'          => ['nullable', 'integer', 'min:1'],
@@ -488,7 +489,7 @@ class AssetExplorerController extends Controller
         return response()->json([
             'rows' => $base()
                 ->orderByDesc('recorded_at')
-                ->orderByDesc('used_id')
+                ->orderByDesc('asset_usage_id')
                 ->forPage($page, $limit)
                 ->get(),
 
@@ -539,7 +540,7 @@ class AssetExplorerController extends Controller
                   ->orWhere('substation_name', 'like', $like);
 
                 if (ctype_digit($term)) {
-                    $q->orWhere('transformer_id', (int) $term);
+                    $q->orWhere('transformer_id', (string) $term);
                 }
             })
             ->select([
@@ -576,9 +577,9 @@ class AssetExplorerController extends Controller
     public function listTransformers(Request $request)
     {
         $v = $request->validate([
-            'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'province_id')],
-            'area_id'     => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'csc_id'      => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'province_id' => ['nullable', 'string', 'max:12', Rule::exists('provinces', 'province_id')],
+            'area_id'     => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'csc_id'      => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
             'search'      => ['nullable', 'string', 'max:120'],
             'page'        => ['nullable', 'integer', 'min:1'],
             'limit'       => ['nullable', 'integer', 'min:1', 'max:200'],
@@ -623,7 +624,7 @@ class AssetExplorerController extends Controller
      * One transformer in full, with the segments that name it and what
      * else its CSC holds.
      */
-    public function showTransformer(int $transformer)
+    public function showTransformer(string $transformer)
     {
         $row = DB::table('v_transformer_detail')
             ->where('transformer_id', $transformer)
@@ -639,11 +640,11 @@ class AssetExplorerController extends Controller
         // kept beside the id because some links were matched by
         // reference text and never resolved to a row.
         $segments = DB::table('segment_transformer as st')
-            ->join('segment_register as sr', 'sr.register_id', '=', 'st.register_id')
+            ->join('segment_register as sr', 'sr.segment_register_id', '=', 'st.segment_register_id')
             ->leftJoin('feeders as f', 'f.feeder_id', '=', 'sr.feeder_id')
             ->where('st.transformer_id', $transformer)
             ->select([
-                'sr.register_id', 'sr.segment_code', 'sr.length_km',
+                'sr.segment_register_id', 'sr.segment_code', 'sr.length_km',
                 'sr.voltage_level', 'sr.status',
                 'f.feeder_code', 'f.feeder_name',
                 'st.transformer_ref',
@@ -688,14 +689,46 @@ class AssetExplorerController extends Controller
      *
      * Transactional. A half-saved batch would report a place total that
      * never existed.
+     *
+     * WHERE THIS DATA COMES FROM AND WHERE IT LANDS
+     *
+     *   Screen    Assets -> "+ Add assets"
+     *   File      frontend/src/pages/Assets/AddAssetsDialog.jsx
+     *   Route     POST /api/network/assets/records
+     *
+     *   assets             CURRENT STATE, edited later. One row per line
+     *                      of the form.
+     *     asset_code       <- GENERATED {csc_code}-{type_code}-{n}
+     *     asset_type_id    <- the line's Asset type dropdown
+     *     csc_id           <- the CSC dropdown (one for the whole form)
+     *     quantity         <- the line's Quantity box
+     *     unit_of_measure  <- THE ASSET-TYPE CATALOGUE, never the request
+     *     capacity_kva     <- the line's kVA box, where the type has one
+     *     condition_status <- the line's Condition dropdown, else UNKNOWN
+     *     install_date     <- the form footer, shared by every line
+     *     remarks          <- the form footer, shared by every line
+     *     status           <- fixed ACTIVE
+     *     created_by       <- the signed-in user
+     *     updated_by       <- the signed-in user
+     *     node_id          <- NULL: this route records holdings, not
+     *     segment_id       <- NULL: where a thing physically sits
+     *
+     *   assets_used        HISTORY, never edited. The same figures again,
+     *                      plus batch_ref (one reference for the whole
+     *                      submission) and recorded_by. Written in the
+     *                      same transaction, so the two cannot disagree
+     *                      about what was entered.
+     *
+     * The full map for every write in the application is in
+     * docs/data-flow.md.
      */
     public function storeRecords(Request $request)
     {
         $data = $request->validate([
-            'csc_id' => ['required', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'csc_id' => ['required', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
 
             'items'                   => ['required', 'array', 'min:1', 'max:40'],
-            'items.*.asset_type_id'   => ['required', 'integer', Rule::exists('asset_types', 'asset_type_id')],
+            'items.*.asset_type_id'   => ['required', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
             'items.*.quantity'        => ['required', 'numeric', 'min:0.001', 'max:100000'],
             'items.*.capacity_kva'    => ['nullable', 'numeric', 'min:0', 'max:1000000'],
             'items.*.condition_status' => ['nullable', Rule::in(['NEW', 'GOOD', 'FAIR', 'POOR', 'FAULTY', 'UNKNOWN'])],
@@ -731,7 +764,7 @@ class AssetExplorerController extends Controller
                 $item['capacity_kva'] ?? '',
             ]))
             ->map(fn ($group) => [
-                'asset_type_id'    => (int) $group->first()['asset_type_id'],
+                'asset_type_id'    => (string) $group->first()['asset_type_id'],
                 'quantity'         => (float) $group->sum('quantity'),
                 'capacity_kva'     => $group->first()['capacity_kva'] ?? null,
                 'condition_status' => $group->first()['condition_status'] ?? 'UNKNOWN',
@@ -774,7 +807,10 @@ class AssetExplorerController extends Controller
             foreach ($items as $item) {
                 $type = $types[$item['asset_type_id']];
 
-                $assetId = DB::table('assets')->insertGetId([
+                $assetId = IdSequence::next('assets');
+
+                DB::table('assets')->insert([
+                    'asset_id'         => $assetId,
                     'asset_code'       => $this->nextAssetCode($csc->csc_code, $type->type_code),
                     'asset_type_id'    => $item['asset_type_id'],
                     'csc_id'           => $csc->csc_id,
@@ -801,6 +837,7 @@ class AssetExplorerController extends Controller
                  * be worse than no log.
                  */
                 DB::table('assets_used')->insert([
+                    'asset_usage_id'   => IdSequence::next('assets_used'),
                     'asset_id'         => $assetId,
                     'asset_type_id'    => $item['asset_type_id'],
                     'csc_id'           => $csc->csc_id,
@@ -817,7 +854,7 @@ class AssetExplorerController extends Controller
 
                 $written[] = [
                     'asset_id'        => $assetId,
-                    'asset_type_id'   => (int) $item['asset_type_id'],
+                    'asset_type_id'   => (string) $item['asset_type_id'],
                     'type_name'       => $type->type_name,
                     'category_name'   => $type->category_name ?? 'Unclassified',
                     'quantity'        => (float) $item['quantity'],
@@ -837,10 +874,10 @@ class AssetExplorerController extends Controller
                 : count($saved) . " records saved to {$csc->csc_name} CSC.",
 
             'place' => [
-                'csc_id'        => (int) $csc->csc_id,
+                'csc_id'        => (string) $csc->csc_id,
                 'csc_code'      => $csc->csc_code,
                 'csc_name'      => $csc->csc_name,
-                'area_id'       => (int) $csc->area_id,
+                'area_id'       => (string) $csc->area_id,
                 'area_name'     => $csc->area_name,
                 'province_name' => $csc->province_name,
             ],
@@ -872,11 +909,11 @@ class AssetExplorerController extends Controller
     private function filters(Request $request): array
     {
         return $request->validate([
-            'province_id'   => ['nullable', 'integer', Rule::exists('provinces', 'province_id')],
-            'area_id'       => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'csc_id'        => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
-            'category_id'   => ['nullable', 'integer'],
-            'asset_type_id' => ['nullable', 'integer', Rule::exists('asset_types', 'asset_type_id')],
+            'province_id'   => ['nullable', 'string', 'max:12', Rule::exists('provinces', 'province_id')],
+            'area_id'       => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'csc_id'        => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
+            'category_id'   => ['nullable', 'string', 'max:12'],
+            'asset_type_id' => ['nullable', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
             'condition'     => ['nullable', Rule::in(['NEW', 'GOOD', 'FAIR', 'POOR', 'FAULTY', 'UNKNOWN'])],
             'source'        => ['nullable', Rule::in(['assets', 'transformers', 'switchgear', 'segment_asset'])],
             'search'        => ['nullable', 'string', 'max:120'],
@@ -904,7 +941,7 @@ class AssetExplorerController extends Controller
             // null rather than truthiness -- `when` would skip a zero.
             ->when(
                 ($f['category_id'] ?? null) !== null,
-                fn ($q) => $q->where('category_id', (int) $f['category_id'])
+                fn ($q) => $q->where('category_id', (string) $f['category_id'])
             )
             ->when(
                 trim($f['search'] ?? '') !== '',
@@ -922,7 +959,7 @@ class AssetExplorerController extends Controller
     }
 
     /** Per-unit totals held by one CSC. */
-    private function placeTotals(int $cscId)
+    private function placeTotals(string $cscId)
     {
         return DB::table('v_asset_register')
             ->where('csc_id', $cscId)
@@ -935,7 +972,7 @@ class AssetExplorerController extends Controller
     }
 
     /** Category breakdown for one CSC. */
-    private function placeCategories(int $cscId)
+    private function placeCategories(string $cscId)
     {
         return DB::table('v_asset_register')
             ->where('csc_id', $cscId)

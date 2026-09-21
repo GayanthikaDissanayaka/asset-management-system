@@ -82,9 +82,21 @@
 
 .hv-totals { grid-template-columns: repeat(5, 1fr); }
 
-.hv-page .dashboard-table-card { min-height: 320px; }
+/* One panel holds both the breakdown and the register, so it no longer
+   needs a floor of its own -- it is as tall as whichever tab is open. */
+.hv-page .dashboard-table-card { min-height: 0; }
 
-.hv-page .depot-table-wrapper { max-height: none; }
+/* The register's own table used to run to whatever length it liked,
+   which on Segments is 1,327 rows. It scrolls under its sticky header
+   instead, so the page stays one screen whatever is selected. */
+.hv-page .depot-table-wrapper { max-height: 420px; overflow-y: auto; }
+
+.hv-panel-bar { margin-bottom: 10px; }
+
+.hv-panel-hint {
+  font-weight: 500;
+  color: var(--dash-ink-muted);
+}
 
 @media (max-width: 1180px) {
   .hv-totals { grid-template-columns: repeat(3, 1fr); }

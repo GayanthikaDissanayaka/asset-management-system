@@ -4,20 +4,6 @@ import axiosClient from '../../api/axiosClient';
 import { describeWriteError } from '../Dashboard/Components/session';
 import { num, formatNumber } from '../Dashboard/Components/data';
 
-/*
- * Record assets against a place, then say what that place now holds.
- *
- * The summary after saving is the point of this dialog, not a
- * confirmation message. Somebody entering forty poles for Welimada
- * wants to know what Welimada has once they are in, and having to go
- * back to a list and work it out is how the same forty poles get
- * entered a second time.
- *
- * So the dialog has two faces. Before saving it is a form; after saving
- * it is the summary, with "Add more here" to come back to the form with
- * the place kept — because entries come in batches for one CSC.
- */
-
 const MAX_ROWS = 12;
 
 const blankRow = () => ({

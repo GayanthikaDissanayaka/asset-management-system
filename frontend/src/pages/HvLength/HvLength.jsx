@@ -7,6 +7,7 @@ import { toArray, num, pick, formatNumber, readUnits, readKva } from '../Dashboa
 import NetworkRegister from '../Dashboard/Components/NetworkRegister';
 import { downloadFromApi } from '../Dashboard/Components/fileTransfer';
 import NotificationBell from '../Dashboard/Components/NotificationBell';
+import { useCurrentUser, canWriteNetwork } from '../Dashboard/Components/session';
 
 import edlMark from '../Auth/edl-mark.png';
 
@@ -87,6 +88,19 @@ const HvLength = () => {
   const navigate = useNavigate();
 
   const [level, setLevel] = useState('area');
+
+  /* One panel at a time. The breakdown and the full register were two
+     tall cards stacked, so the page was mostly scrolling past the one
+     you were not reading. */
+  const [panel, setPanel] = useState('breakdown');
+
+  /* Bumped by the header button; NetworkRegister opens its own dialog
+     when this changes, so the dialog and its options loading stay in
+     one place. */
+  const [addSignal, setAddSignal] = useState(0);
+
+  const user = useCurrentUser();
+  const mayWrite = canWriteNetwork(user);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [options, setOptions] = useState({ provinces: [], areas: [], cscs: [] });
   const [voltages, setVoltages] = useState([]);
@@ -152,8 +166,12 @@ const HvLength = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    if ((registerFocus || location.hash === '#register') && registerRef.current) {
-      registerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (registerFocus || location.hash === '#register') {
+      // The register is a tab now, so arriving from a search result or
+      // from the dashboard's "Full register" link has to select it —
+      // scrolling to a panel that is not showing lands on nothing.
+      setPanel('register');
+      registerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [registerFocus, location.hash]);
 
@@ -230,6 +248,32 @@ const HvLength = () => {
   const filtered =
     Boolean(filters.provinceId || filters.areaId || filters.cscId || filters.voltage);
 
+  /*
+   * A row is a place, so selecting it goes into that place and drops the
+   * grouping one level: the province table opens its areas, an area opens
+   * its CSCs, a CSC opens its feeders. Feeder is the bottom — there is
+   * nothing below a feeder to group by — so those rows are not clickable.
+   *
+   * This is the same movement as the filters above, done by pointing at
+   * what you want instead of finding it in a dropdown.
+   */
+  const drillInto = (row) => {
+    if (level === 'province') {
+      setFilters((f) => ({ ...f, provinceId: String(row.group_id), areaId: '', cscId: '' }));
+      setLevel('area');
+      return;
+    }
+    if (level === 'area') {
+      setFilters((f) => ({ ...f, areaId: String(row.group_id), cscId: '' }));
+      setLevel('csc');
+      return;
+    }
+    if (level === 'csc') {
+      setFilters((f) => ({ ...f, cscId: String(row.group_id) }));
+      setLevel('feeder');
+    }
+  };
+
   const goBack = () => {
     if (window.history.state?.idx > 0) navigate(-1);
     else navigate('/dashboard');
@@ -274,6 +318,27 @@ const HvLength = () => {
             onClick={() => navigate('/dashboard')}
           >
             Dashboard
+          </button>
+
+          {/* The one thing people come to this page to DO. It used to sit
+              in the register's own toolbar at the very bottom, so adding
+              a length meant scrolling past every table first. */}
+          <button
+            type="button"
+            className="ax-add-button"
+            onClick={() => {
+              // Show the register too: what you just added appears there.
+              setPanel('register');
+              setAddSignal((n) => n + 1);
+            }}
+            disabled={!mayWrite}
+            title={
+              mayWrite
+                ? 'Record a length of HV line'
+                : 'Your role does not allow recording line. An administrator can widen your access.'
+            }
+          >
+            + HV Length
           </button>
 
           <button
@@ -394,7 +459,9 @@ const HvLength = () => {
         </div>
       </section>
 
-      {/* The answer, before the breakdown. */}
+      {/* The answer, before the breakdown. The three tiles that name a
+          level regroup the table below to it, so the summary is also the
+          way into the detail. */}
       <section className="summary-cards hv-totals">
         <div className="summary-card accent-1">
           <span className="summary-label">HV Length</span>
@@ -418,78 +485,112 @@ const HvLength = () => {
           </span>
         </div>
 
-        <div className="summary-card accent-3">
-          <span className="summary-label">CSCs</span>
-          <span className="summary-value">{formatNumber(num(totals?.csc_count))}</span>
-          <span className="summary-hint">Consumer service centres counted</span>
-        </div>
-
-        <div className="summary-card accent-4">
-          <span className="summary-label">Areas</span>
-          <span className="summary-value">{formatNumber(num(totals?.area_count))}</span>
-          <span className="summary-hint">Operational areas counted</span>
-        </div>
-
-        <div className="summary-card accent-5">
-          <span className="summary-label">Feeders</span>
-          <span className="summary-value">{formatNumber(num(totals?.feeder_count))}</span>
-          <span className="summary-hint">Feeders with recorded line</span>
-        </div>
+        {[
+          { key: 'csc', accent: 'accent-3', label: 'CSCs', value: totals?.csc_count, hint: 'Consumer service centres counted' },
+          { key: 'area', accent: 'accent-4', label: 'Areas', value: totals?.area_count, hint: 'Operational areas counted' },
+          { key: 'feeder', accent: 'accent-5', label: 'Feeders', value: totals?.feeder_count, hint: 'Feeders with recorded line' },
+        ].map((tile) => (
+          <button
+            type="button"
+            key={tile.key}
+            className={`summary-card is-clickable ${tile.accent}${
+              level === tile.key ? ' is-current' : ''
+            }`}
+            onClick={() => setLevel(tile.key)}
+            title={`Group the table below by ${tile.label.toLowerCase()}`}
+          >
+            <span className="summary-label">
+              {tile.label}
+              <span className="summary-more" aria-hidden="true">
+                {level === tile.key ? 'Shown below' : 'Group by →'}
+              </span>
+            </span>
+            <span className="summary-value">{formatNumber(num(tile.value))}</span>
+            <span className="summary-hint">{tile.hint}</span>
+          </button>
+        ))}
       </section>
 
-      <section className="dashboard-card dashboard-table-card">
-        <div className="card-header">
-          <h2>
-            {LEVELS.find((l) => l.key === level)?.label} breakdown
-          </h2>
-          <p>
-            Length is the share inside each row, so a segment crossing a
-            boundary is counted once in each place, for its own part only.
-          </p>
-        </div>
-
-        {error && <div className="register-error">{error}</div>}
-
-        {loading && !data ? (
-          <div className="chart-empty">Loading HV length...</div>
-        ) : (
-          <DataTable
-            columns={COLUMNS[level]}
-            rows={data?.rows || []}
-            rowKey={(r) => `${level}-${r.group_id}`}
-            initialSortKey="total_km"
-            footerLabel="Total"
-            emptyMessage="Nothing matches these filters."
-            isRowMuted={(r) => num(r.total_km) === 0}
-          />
-        )}
-      </section>
-
+      {/* ONE panel, not two stacked cards. The breakdown and the full
+          register answer different questions and you are only ever
+          asking one of them, so only one is on screen. */}
       <section
-        className="dashboard-card dashboard-table-card hv-register"
+        className="dashboard-card dashboard-table-card hv-panel"
         id="register"
         ref={registerRef}
       >
-        <div className="card-header">
-          <h2>Network Register</h2>
-          <p>
-            Every row at every level: transformers, areas, CSCs, feeders,
-            segments and assets. Click a column heading to sort.
-          </p>
+        <div className="register-toolbar hv-panel-bar">
+          <div className="register-tabs" role="tablist" aria-label="What to show">
+            {[
+              { key: 'breakdown', label: `${LEVELS.find((l) => l.key === level)?.label} breakdown` },
+              { key: 'register', label: 'Network Register' },
+            ].map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                role="tab"
+                aria-selected={panel === p.key}
+                className={`register-tab${panel === p.key ? ' is-active' : ''}`}
+                onClick={() => setPanel(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="register-summary hv-panel-hint">
+            {panel === 'breakdown'
+              ? `Share inside each row${level !== 'feeder' ? ' · select a row to open it' : ''}`
+              : 'Every row at every level · click a heading to sort'}
+          </span>
         </div>
 
         {notice && <div className="dashboard-inline-notice">{notice}</div>}
 
-        <NetworkRegister
-          cscSummaryRows={cscSummaryRows}
-          onToast={setNotice}
-          focus={registerFocus}
-          dataVersion={registerVersion}
-          onDataChanged={() => {
-            setRegisterVersion((v) => v + 1);
-            load();
-          }}
-        />
+        {panel === 'breakdown' ? (
+          <>
+            {error && <div className="register-error">{error}</div>}
+
+            {loading && !data ? (
+              <div className="chart-empty">Loading HV length...</div>
+            ) : (
+              <DataTable
+                columns={COLUMNS[level]}
+                rows={data?.rows || []}
+                rowKey={(r) => `${level}-${r.group_id}`}
+                initialSortKey="total_km"
+                footerLabel="Total"
+                emptyMessage="Nothing matches these filters."
+                isRowMuted={(r) => num(r.total_km) === 0}
+                onRowClick={level === 'feeder' ? undefined : drillInto}
+                rowTitle={
+                  level === 'feeder'
+                    ? undefined
+                    : (r) => `Open ${r.group_name || 'this place'}`
+                }
+                maxHeight={360}
+              />
+            )}
+          </>
+        ) : null}
+
+        {/* Kept mounted and hidden rather than unmounted, for two
+            reasons: the header's "+ HV Length" needs it there to open
+            its dialog, and switching tabs would otherwise throw away
+            whatever was typed in the register's search box. */}
+        <div hidden={panel !== 'register'}>
+          <NetworkRegister
+            openAddSignal={addSignal}
+            cscSummaryRows={cscSummaryRows}
+            onToast={setNotice}
+            focus={registerFocus}
+            dataVersion={registerVersion}
+            onDataChanged={() => {
+              setRegisterVersion((v) => v + 1);
+              load();
+            }}
+          />
+        </div>
       </section>
     </div>
   );

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 class PlaceHoldings
 {
     /** The CSC with its area and province, or null. */
-    public static function place(int $cscId): ?object
+    public static function place(string $cscId): ?object
     {
         return DB::table('csc_depots as d')
             ->join('areas as a', 'a.area_id', '=', 'd.area_id')
@@ -30,7 +30,7 @@ class PlaceHoldings
             ->first();
     }
 
-    public static function totals(int $cscId)
+    public static function totals(string $cscId)
     {
         return DB::table('v_asset_register')
             ->where('csc_id', $cscId)
@@ -42,7 +42,7 @@ class PlaceHoldings
             ->get();
     }
 
-    public static function categories(int $cscId)
+    public static function categories(string $cscId)
     {
         return DB::table('v_asset_register')
             ->where('csc_id', $cscId)

@@ -25,7 +25,7 @@ class MaintenanceLogController extends Controller
         return response()->json($log, 201);
     }
 
-    public function forAsset(int $assetId)
+    public function forAsset(string $assetId)
     {
         return response()->json(
             MaintenanceLog::where('asset_id', $assetId)

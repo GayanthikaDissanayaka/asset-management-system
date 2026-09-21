@@ -1,21 +1,3 @@
-/* =====================================================================
-   ASSETS PAGE
-
-   Shares the dashboard shell, cards and table by importing Dashbord.css
-   first; only what is specific to this page lives here.
-
-   Every class is prefixed `ax-`. Create React App bundles every
-   stylesheet into one file, so a generic name like `.card` or `.field`
-   written here would reach into the sign-in form and the dashboard
-   dialogs. That has happened twice on this project already — the yellow
-   sign-in buttons and the uppercased register hints — so the prefix is
-   not decoration.
-
-   The page scrolls. It carries a transformer lookup, a filter row, five
-   tiles and a table that runs to seventeen CSCs, and squeezing that into
-   a fixed viewport would make the table scroll inside a box instead of
-   the page scrolling normally.
-   ===================================================================== */
 
 .ax-page {
   height: auto;
@@ -24,14 +6,9 @@
   grid-template-rows: none;
   padding-bottom: 26px;
 
-  /* Grid aligns content to stretch by default, which on a short page
-     grows every row and leaves dead space inside each card. */
   align-content: start;
 }
 
-/* Units are set apart from the figure they qualify, so `1,711 nos` never
-   reads as one number and the reader can see at a glance that the tile
-   beside it is measuring something else. */
 .ax-unit {
   font-style: normal;
   font-size: 0.62em;
@@ -41,11 +18,6 @@
   margin-left: 1px;
 }
 
-/* The primary action, sitting on the maroon header bar.
-   dash-btn-primary cannot be used here: it is maroon on maroon and
-   disappears into the bar — the same way the Add segment button went
-   missing before. White on maroon is the only high-contrast fill left,
-   since yellow already belongs to Refresh. */
 .ax-add-button {
   font: inherit;
   font-size: 12.5px;
@@ -67,17 +39,12 @@
   outline-offset: 2px;
 }
 
-/* Disabled rather than hidden: a viewer who cannot see the button
-   assumes the feature is missing; one who sees it greyed knows to ask
-   an administrator. The title attribute carries the reason. */
 .ax-add-button:disabled {
   color: rgba(255, 255, 255, 0.72);
   background: transparent;
   border-color: rgba(255, 255, 255, 0.35);
   cursor: default;
 }
-
-/* ------------------------------------------------------- lookup card */
 
 .ax-lookup { gap: 10px; }
 
@@ -190,7 +157,7 @@
 }
 
 .ax-filter > span {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -200,7 +167,7 @@
 .ax-filter select,
 .ax-filter input {
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--dash-ink);
   padding: 7px 10px;
   min-width: 158px;
@@ -244,213 +211,18 @@
 
 .ax-totals { grid-template-columns: repeat(5, 1fr); }
 
-/* ------------------------------------------------- category cards */
+/* ------------------------------------------------ the main panel */
 
 .ax-main { gap: 10px; }
 
 .ax-view-hint { margin: 0 0 2px; }
 
-.ax-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  gap: 10px;
-  align-items: start;
-}
-
-.ax-card {
-  border: 1px solid var(--dash-line);
-  border-radius: 10px;
-  background: #FFFFFF;
-  overflow: hidden;
-  transition: box-shadow 0.15s, border-color 0.15s;
-}
-
-.ax-card:hover { box-shadow: var(--dash-shadow); }
-
-.ax-card.is-open {
-  border-color: var(--ax-accent);
-  box-shadow: var(--dash-shadow);
-
-  /* An opened card spans the grid so its types list in one column
-     instead of a cramped strip inside a 268px cell. */
-  grid-column: 1 / -1;
-}
-
-.ax-card.is-empty { opacity: 0.62; }
-
-.ax-card-head {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    'title  chevron'
-    'values chevron'
-    'meta   chevron';
-  gap: 2px 10px;
-  align-items: center;
-
-  text-align: left;
-  font: inherit;
-  padding: 11px 12px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.ax-card-head:focus-visible {
-  outline: 2px solid var(--ax-accent);
-  outline-offset: -2px;
-}
-
-.ax-card-title {
-  grid-area: title;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--dash-ink);
-}
-
-/* Colour is decoration only. Every value on the card is written out as
-   text, so nothing here depends on telling the hues apart. */
-.ax-card-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  background: var(--ax-accent);
-  flex: none;
-}
-
-.ax-card-values {
-  grid-area: values;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-}
-
-.ax-card-value {
-  font-size: 21px;
-  font-weight: 700;
-  line-height: 1.15;
-  color: var(--dash-ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.ax-card-value em {
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dash-ink-muted);
-  margin-left: 3px;
-}
-
-.ax-card-meta {
-  grid-area: meta;
-  font-size: 11px;
-  color: var(--dash-ink-muted);
-}
-
-.ax-card-chevron {
-  grid-area: chevron;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: #F6F1F3;
-  color: var(--dash-ink-soft);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.ax-card.is-open .ax-card-chevron {
-  background: var(--ax-accent);
-  color: #FFFFFF;
-}
-
-/* ------------------------------------------------ types drill-down */
-
-.ax-types {
-  list-style: none;
-  margin: 0;
-  padding: 0 12px 12px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 7px;
-  border-top: 1px solid var(--dash-line);
-  padding-top: 11px;
-}
-
-.ax-type {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    'name  value'
-    'meta  value';
-  gap: 1px 10px;
-  align-items: center;
-
-  text-align: left;
-  font: inherit;
-  padding: 8px 10px;
-  border: 1px solid var(--dash-line);
-  border-radius: 8px;
-  background: #FFFFFF;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.ax-type:hover { background: #FCF7F9; border-color: var(--dash-line-strong); }
-
-.ax-type:focus-visible {
-  outline: 2px solid var(--ax-accent);
-  outline-offset: 1px;
-}
-
-.ax-type.is-selected {
-  border-color: var(--ax-accent);
-  background: #FFF9FB;
-  box-shadow: inset 3px 0 0 var(--ax-accent);
-}
-
-.ax-type.is-zero { opacity: 0.55; }
-
-.ax-type-name {
-  grid-area: name;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--dash-ink);
-}
-
-.ax-type-meta {
-  grid-area: meta;
-  font-size: 10.5px;
-  color: var(--dash-ink-muted);
-}
-
-.ax-type-value {
-  grid-area: value;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--dash-ink);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.ax-type-value em {
-  font-style: normal;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--dash-ink-muted);
-  margin-left: 2px;
-}
+/* The main-asset and type drill-down is a table now, drawn by the shared
+   DataTable, so its rows, sorting and totals are styled once in
+   Dashbord.css and look the same here as on every other screen. The card
+   grid this replaced lived here. */
 
 /* -------------------------------------------------- records table */
-
-.ax-records { max-height: 520px; }
 
 .ax-pager {
   display: flex;

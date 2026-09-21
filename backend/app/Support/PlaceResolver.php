@@ -143,7 +143,7 @@ class PlaceResolver
     private function lookup(
         array $index,
         string $text,
-        ?int $areaId,
+        ?string $areaId,
         string $how,
         string $cscText,
         string $areaText
@@ -196,7 +196,7 @@ class PlaceResolver
 
         return [
             'ok'         => true,
-            'csc_id'     => (int) $csc->csc_id,
+            'csc_id'     => (string) $csc->csc_id,
             'csc'        => $csc,
             // "fuzzy" when the text only matched after normalising, so
             // the reader can see which rows were interpreted rather than
@@ -225,7 +225,7 @@ class PlaceResolver
         };
     }
 
-    private function resolveArea(string $text): ?int
+    private function resolveArea(string $text): ?string
     {
         if ($text === '') {
             return null;

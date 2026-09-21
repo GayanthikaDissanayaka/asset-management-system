@@ -1,18 +1,3 @@
-/* =====================================================================
-   Dashboard — CEB Uva Province, Network Asset Management
-   Filename kept as Dashbord.css to match the existing import.
-
-   Layout goal: the whole dashboard on one screen with no page scroll.
-   The page is a four-row grid pinned to the viewport height. Only the
-   depot table scrolls, inside its own card, because seventeen depots
-   cannot honestly be shown at once.
-
-   Colour: the EDL maroon and yellow drive the chrome. The series
-   colours the charts draw with live in Components/palette.js, where
-   they are documented and validated; they are deliberately NOT
-   redefined here, so there is one source of truth for them.
-   ===================================================================== */
-
 :root {
   --dash-maroon:       #6B002C;
   --dash-maroon-deep:  #2B0816;
@@ -37,17 +22,15 @@
 
 .dashboard-page {
   box-sizing: border-box;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  height: auto;
+  overflow: visible;
 
-  display: grid;
-  /* header, place bar, tiles, charts, register. The place bar is always
-     present so its row never appears and disappears; see
-     .dashboard-subbar. */
-  grid-template-rows: auto auto auto minmax(0, 1fr) minmax(0, 1.15fr);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 
-  padding: 14px 18px;
+  padding: 14px 18px 28px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     Helvetica, Arial, sans-serif;
   color: var(--dash-ink);
@@ -60,16 +43,14 @@
 
 .dashboard-page * { box-sizing: border-box; }
 
-/* Refetch holds the previous render and dims it, rather than tearing the
-   layout down to a spinner. */
 .dashboard-page.is-refreshing .dashboard-charts,
 .dashboard-page.is-refreshing .summary-cards,
+.dashboard-page.is-refreshing .dashboard-panel,
 .dashboard-page.is-refreshing .dashboard-table-card {
   opacity: 0.55;
   transition: opacity 0.18s ease;
 }
 
-/* Loading and error states replace the grid with a simple centred box. */
 .dashboard-page-centred {
   display: flex;
   align-items: center;
@@ -95,6 +76,63 @@
     var(--dash-maroon-lift) 100%
   );
   box-shadow: 0 4px 16px rgba(107, 0, 44, 0.22);
+}
+
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px 10px;
+  background: linear-gradient(180deg, rgba(107, 0, 44, 0.96), rgba(64, 0, 28, 0.96));
+  border-radius: var(--dash-radius);
+  box-shadow: 0 4px 16px rgba(107, 0, 44, 0.18);
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 28px);
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dashboard-notify-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.logout-button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .dashboard-identity {
@@ -146,7 +184,6 @@
   background: var(--dash-yellow);
 }
 
-/* Quiet control on the dark header, so it does not compete with Refresh. */
 .dashboard-back {
   display: inline-flex;
   align-items: center;
@@ -175,7 +212,6 @@
   outline-offset: 2px;
 }
 
-/* The brand yellow carries the primary action, as on the welcome page. */
 .refresh-button {
   background: var(--dash-yellow);
   border: 1px solid var(--dash-yellow-deep);
@@ -216,8 +252,6 @@
   box-shadow: var(--dash-shadow);
 }
 
-/* A 3px rail rather than a heavy left border: the colour identifies the
-   tile without turning into a large saturated block. */
 .summary-card::before {
   content: '';
   position: absolute;
@@ -239,8 +273,6 @@
   color: var(--dash-ink-muted);
 }
 
-/* Proportional figures: tabular digits make a standalone number look
-   loose at display sizes. */
 .summary-value {
   font-size: 25px;
   font-weight: 650;
@@ -262,30 +294,76 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  min-height: 0;
 }
 
 .dashboard-card {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  min-width: 0; /* lets Recharts shrink inside a grid cell */
+  min-width: 0;
 
   background: var(--dash-surface);
   border: 1px solid var(--dash-line);
   border-radius: var(--dash-radius);
-  padding: 12px 14px;
+  padding: 10px 12px;
   box-shadow: var(--dash-shadow);
 }
 
+/* The three overview panels sit inside the dashboard's one card now, so
+   they carry no card chrome of their own — a border and a shadow inside
+   a border and a shadow only adds visual noise and padding. */
+.dashboard-panel-cell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 232px;
+}
+
+/* A table needs the room its rows ask for, where a chart is drawn to
+   whatever height it is given. Its own maxHeight keeps it to about the
+   same 232px, so switching Charts/Tables does not resize the page. */
+.dashboard-charts.is-tables .dashboard-panel-cell { height: auto; }
+
+/* --------------------------------------------------- the one panel */
+
+.dashboard-panel { gap: 0; }
+
+/* A place, named once above whichever table is showing. The tiles above
+   already carry its headline figures; printing them again here was half
+   the height of this card. */
+.pp-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 5px 10px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+
+.pp-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--dash-ink);
+}
+
+.pp-bar .pp-hint { margin-left: auto; }
+
+/* The tile whose level the table below is already grouped by. */
+.summary-card.is-current {
+  border-color: var(--dash-maroon);
+  box-shadow: 0 0 0 1px rgba(107, 0, 44, 0.18), var(--dash-shadow);
+}
+
+.summary-card.is-current .summary-more { opacity: 1; color: var(--dash-ink-muted); }
+
 .card-header {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   flex-shrink: 0;
 }
 
 .card-header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: -0.005em;
   color: var(--dash-ink);
@@ -293,12 +371,10 @@
 
 .card-header p {
   margin: 1px 0 0;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--dash-ink-muted);
 }
 
-/* Fills the card below the heading. min-height:0 is what lets the
-   Recharts container resolve height:100% inside a flex column. */
 .chart-wrapper {
   flex: 1;
   min-height: 0;
@@ -322,9 +398,6 @@
 
 /* ------------------------------------------------------------- donut */
 
-/* Ring beside the legend rather than above it. Stacked, the ring is
-   bound by the leftover height and collapses to a token; side by side it
-   is bound by the card's short edge and stays legible. */
 .donut-block {
   flex: 1;
   min-height: 0;
@@ -341,8 +414,6 @@
   min-width: 0;
 }
 
-/* The share is printed as text beside every swatch. Two palette slots
-   sit below 3:1 on white, so the number must not depend on the colour. */
 .donut-legend {
   list-style: none;
   margin: 0;
@@ -391,9 +462,7 @@
 .dashboard-table-card { min-height: 0; }
 
 .depot-table-wrapper {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
   border: 1px solid var(--dash-line);
   border-radius: 8px;
 }
@@ -432,8 +501,6 @@
 
 .depot-table tbody tr:hover { background: #FCFAFB; }
 
-/* A depot with nothing recorded is a gap in the register, not noise, so
-   it stays in the table and reads as quieter rather than being hidden. */
 .depot-table tbody tr.is-empty td { color: var(--dash-ink-muted); }
 .depot-table tbody tr.is-empty .depot-name { color: var(--dash-ink-muted); }
 
@@ -486,6 +553,106 @@
   position: sticky;
   bottom: 0;
 }
+
+/* --------------------------------------------- tables that lead somewhere
+
+   A table is the drill-down across this application, not only the
+   summary, so a row can be a control. Three things have to be visible
+   for that to be usable: that the row can be selected at all, which row
+   is selected now, and where a row opens to. Hence the pointer and lift
+   on hover, the maroon rule down the left of the current row, and the
+   focus ring — a table you can only reach with a mouse would put the
+   whole drill-down out of reach of anyone using the keyboard. */
+
+.depot-table tbody tr.is-clickable { cursor: pointer; }
+
+.depot-table tbody tr.is-clickable:hover {
+  background: #FBF3F7;
+  box-shadow: inset 2px 0 0 var(--dash-maroon-lift);
+}
+
+.depot-table tbody tr.is-clickable:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: -2px;
+  background: #FBF3F7;
+}
+
+.depot-table tbody tr.is-active > td {
+  background: #FDF1F6;
+  font-weight: 600;
+}
+
+.depot-table tbody tr.is-active > td:first-child {
+  box-shadow: inset 3px 0 0 var(--dash-maroon);
+}
+
+/* Scrolls under its own sticky header and footer. */
+.depot-table-wrapper.is-scrolled { overflow-y: auto; }
+
+/* Dense is for tables inside a card, a dialog or a small panel, where
+   the figures matter more than the breathing room. */
+.depot-table.is-dense { font-size: 11.5px; }
+.depot-table.is-dense thead th { padding: 6px 9px; font-size: 10px; }
+.depot-table.is-dense td { padding: 5px 9px; }
+.depot-table.is-dense tfoot td { padding: 6px 9px; }
+.depot-table.is-dense .depot-code { font-size: 9.5px; }
+
+/* ------------------------------------------------- rows that open up */
+
+.dt-expand-head,
+.dt-expand-cell {
+  width: 34px;
+  padding-left: 8px !important;
+  padding-right: 0 !important;
+  cursor: default;
+}
+
+.dt-expander {
+  width: 21px;
+  height: 21px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--dash-maroon);
+  background: #F7EDF2;
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dt-expander:hover {
+  background: var(--dash-maroon);
+  border-color: var(--dash-maroon);
+  color: #FFFFFF;
+}
+
+.dt-expander:focus-visible {
+  outline: 2px solid var(--dash-maroon);
+  outline-offset: 1px;
+}
+
+.depot-table tbody tr.is-open > td {
+  background: #FBF5F8;
+  border-bottom-color: transparent;
+}
+
+.dt-sub-row > .dt-sub-cell {
+  padding: 0 11px 11px 34px;
+  background: #FBF5F8;
+}
+
+.dt-sub {
+  border-left: 2px solid var(--dash-maroon-lift);
+  padding-left: 10px;
+}
+
+.dt-sub .depot-table-wrapper { background: #FFFFFF; }
 
 /* ------------------------------------------------- loading and error */
 
@@ -551,8 +718,6 @@
   gap: 10px;
 }
 
-/* Two class selectors, so this beats the solid `.dashboard-error button`
-   fill above and the retry action stays the primary one. */
 .dashboard-error .dashboard-error-back {
   background: #FFFFFF;
   color: var(--dash-maroon);
@@ -618,8 +783,6 @@
   white-space: nowrap;
 }
 
-/* Sits beside Refresh in the dark header, quieter than the yellow
-   primary action but clearly available. Administrators only. */
 .approvals-button {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.34);
@@ -642,6 +805,11 @@
 .approvals-button:focus-visible {
   outline: 2px solid var(--dash-yellow);
   outline-offset: 2px;
+}
+
+.approvals-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ------------------------------------------------------- approval rows */
@@ -676,7 +844,6 @@
   font-size: 11px;
 }
 
-/* Role, area and CSC are one decision, so they sit on one line. */
 .approval-grant {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -705,9 +872,6 @@
   margin-bottom: 9px;
 }
 
-/* Segmented control. One rail, the active view filled, so the five
-   readings of the same register look like one control rather than five
-   loose buttons. */
 .register-tabs {
   display: inline-flex;
   padding: 2px;
@@ -774,8 +938,6 @@
   box-shadow: 0 0 0 3px rgba(107, 0, 44, 0.11);
 }
 
-/* Marks a segment added through this application rather than one of the
-   original spreadsheet loads, so a new entry is easy to spot. */
 .source-pill {
   display: inline-block;
   margin-left: 6px;
@@ -791,8 +953,6 @@
   cursor: help;
 }
 
-/* Says why the write buttons are off, beside them, rather than leaving a
-   greyed button to look broken. */
 .register-readonly {
   font-size: 11px;
   font-weight: 700;
@@ -959,16 +1119,6 @@
   border: 1px solid #F2D3DA;
 }
 
-/* ------------------------------------------------------------ fields
-
-   Every rule here is scoped to `.dialog`.
-
-   `field`, `field-error` and `invalid` are also used by the sign-in and
-   registration screens in Auth/auth.css. Create React App bundles every
-   stylesheet into one file, so an unscoped `.field > span` here reached
-   into those forms and set their hint text in bold uppercase. Scoping is
-   what keeps the two apart; do not lift these back out. */
-
 .dialog .field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1057,8 +1207,6 @@
   color: var(--dash-maroon);
 }
 
-/* auto-FILL, not auto-fit: a category holding a single asset type keeps a
-   normal-width box instead of stretching one input across the dialog. */
 .quantity-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
@@ -1082,8 +1230,6 @@
 
 .dialog .quantity-field input { padding: 6px 8px; }
 
-/* Running total. Turns amber when the conductor lengths do not add up to
-   the route length, which is a flag rather than a block. */
 .dialog-tally {
   display: flex;
   align-items: baseline;
@@ -1119,8 +1265,6 @@
   gap: 8px;
 }
 
-/* Select, length, remove. The remove button keeps a fixed track so the
-   selects stay aligned down the column. */
 .csc-row {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 30px;
@@ -1174,8 +1318,6 @@
 
 .dash-btn-quiet.dash-btn-sm { padding: 6px 12px; font-size: 12px; }
 
-/* Marks a segment running through more than one CSC. Hovering shows the
-   split. */
 .crossing-pill {
   display: inline-block;
   min-width: 20px;
@@ -1314,35 +1456,236 @@
 
 .dialog-recap strong { color: var(--dash-maroon); }
 
-/* ------------------------------------------------------- responsive */
+/* =====================================================================
+   SIDEBAR NAV (icon + label)
+   ===================================================================== */
 
-/* Three chart cards need real width. Below this the grid drops to two
-   columns and the page is allowed to scroll again, because forcing four
-   rows into a short viewport squeezes every chart into illegibility. */
-@media (max-width: 1180px), (max-height: 660px) {
-  .dashboard-page {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
-    grid-template-rows: none;
-    padding-bottom: 24px;
-  }
-
-  .dashboard-charts { grid-template-columns: repeat(2, 1fr); }
-
-  .chart-wrapper,
-  .donut-block { min-height: 240px; }
-
-  .depot-table-wrapper { max-height: 420px; }
+.sidebar-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+
+.sidebar-status .dashboard-inline-notice,
+.sidebar-status .dashboard-inline-error {
+  width: 100%;
+  max-width: none;
+  text-align: center;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-nav-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+}
+
+.sidebar-nav-item:focus-visible {
+  outline: 2px solid var(--dash-yellow);
+  outline-offset: 2px;
+}
+
+.sidebar-nav-item:disabled {
+  color: rgba(255, 255, 255, 0.4);
+  cursor: default;
+}
+
+.sidebar-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--dash-maroon-deep);
+  background: var(--dash-yellow);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  padding-top: 10px;
+}
+
+.sidebar-logout {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar-logout:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+}
+
+/* =====================================================================
+   HEADER TOOLS (search + refresh, grouped together)
+   ===================================================================== */
+
+.dashboard-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.refresh-button-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.refresh-button-header svg.is-spinning {
+  animation: dashboard-spin 0.8s linear infinite;
+}
+
+/* =====================================================================
+   MOBILE NAV TOGGLE + DRAWER
+   ===================================================================== */
+
+.dashboard-nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.dashboard-nav-toggle span {
+  display: block;
+  height: 2px;
+  background: #FFFFFF;
+  border-radius: 2px;
+}
+
+.dashboard-nav-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(43, 8, 22, 0.46);
+}
+
+/* ------------------------------------------------------- responsive */
 
 @media (max-width: 1180px) {
   .summary-cards { grid-template-columns: repeat(3, 1fr); }
+  .dashboard-charts { grid-template-columns: repeat(2, 1fr); }
+
+  .dashboard-shell { grid-template-columns: 72px minmax(0, 1fr); }
+  .sidebar-nav-label { display: none; }
+  .sidebar-nav-item { justify-content: center; padding: 9px; }
+  .sidebar-nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
+}
+
+@media (max-width: 980px) {
+  .pf-field select { min-width: 120px; }
+  .dashboard-welcome-inline { margin-left: 0; }
 }
 
 @media (max-width: 820px) {
   .summary-cards { grid-template-columns: repeat(2, 1fr); }
   .dashboard-charts { grid-template-columns: 1fr; }
+
+  .dashboard-panel-cell { height: 260px; }
+
+  .dashboard-nav-toggle { display: flex; }
+  .dashboard-nav-scrim { display: block; }
+
+  .dashboard-shell { grid-template-columns: minmax(0, 1fr); }
+
+  .dashboard-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 220px;
+    max-height: none;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .dashboard-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .dashboard-sidebar.is-open .sidebar-nav-label {
+    display: inline;
+  }
+
+  .dashboard-sidebar.is-open .sidebar-nav-item {
+    justify-content: flex-start;
+  }
+
+  .dashboard-sidebar.is-open .sidebar-nav-badge {
+    position: static;
+  }
+
+  .dashboard-header-tools {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1350,7 +1693,6 @@
   .summary-cards { grid-template-columns: 1fr 1fr; }
   .dashboard-identity { gap: 9px; }
 
-  /* Too narrow to sit the ring beside the legend. */
   .donut-block { flex-direction: column; align-items: stretch; gap: 8px; }
   .donut-plot { flex: 1; min-height: 150px; }
 }
@@ -1362,19 +1704,12 @@
   .dashboard-page.is-refreshing .dashboard-table-card {
     transition: none;
   }
+  .refresh-button-header svg.is-spinning { animation-duration: 2.4s; }
+  .dashboard-sidebar { transition: none; }
 }
 
 /* =====================================================================
    GLOBAL SEARCH
-
-   Lives inside the header bar, not in a band of its own: the dashboard
-   is deliberately one screen with no scrolling, and another row would
-   push the charts off it. The results panel is absolutely positioned so
-   it overlays the page rather than displacing anything.
-
-   Every class is prefixed `gs-`. This stylesheet is bundled into the
-   same file as the auth screens, so a generic name here reaches into
-   them — that has caused two regressions on this project already.
    ===================================================================== */
 
 .gs {
@@ -1426,8 +1761,6 @@
 .gs-field:focus-within .gs-input { color: var(--dash-ink); }
 .gs-field:focus-within .gs-input::placeholder { color: var(--dash-ink-muted); }
 
-/* Chrome draws its own clear affordance on type=search; it lands on the
-   maroon bar as an invisible dark smudge. */
 .gs-input::-webkit-search-cancel-button { display: none; }
 
 .gs-busy {
@@ -1445,8 +1778,6 @@
 @media (prefers-reduced-motion: reduce) {
   .gs-busy { animation-duration: 2.4s; }
 }
-
-/* ------------------------------------------------------------ panel */
 
 .gs-panel {
   position: absolute;
@@ -1475,8 +1806,6 @@
   list-style: none;
   margin: 0;
   padding: 4px;
-
-  /* Twelve hits at once would run past the fold on a laptop. */
   max-height: 340px;
   overflow-y: auto;
 }
@@ -1504,8 +1833,6 @@
   outline-offset: -2px;
 }
 
-/* The kind is named in words, never by colour alone — the accent is a
-   second cue for people who already read the label. */
 .gs-kind {
   justify-self: start;
   font-size: 9.5px;
@@ -1570,19 +1897,13 @@
 .gs-hint { white-space: nowrap; }
 
 @media (max-width: 980px) {
-  /* Below this the header is already wrapping; a search box competing
-     for the same row makes both unusable. */
   .gs { flex-basis: 100%; margin: 6px 0 0; max-width: none; }
   .gs-panel { min-width: 0; }
   .gs-hit { grid-template-columns: 74px 1fr; }
   .gs-place { display: none; }
 }
 
-/* --------------------------------------------------- import: filing
-
-   Where each place name in the sheet was filed. The sheet says
-   "Hali Ela"; the register says BDL-CSC02. Showing the mapping is what
-   makes an import checkable instead of merely reported. */
+/* --------------------------------------------------- import: filing */
 
 .import-places li {
   display: flex;
@@ -1600,8 +1921,6 @@
 
 .import-place-to { color: var(--dash-ink-soft); }
 
-/* Marks a name that was interpreted rather than read literally, so the
-   rows worth checking are the ones that stand out. */
 .import-place-flag {
   font-style: normal;
   font-size: 10px;
@@ -1621,14 +1940,7 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------- sign-in greeting
-
-   Shown on arrival from the sign-in screen, not on the auth page: that
-   page navigates away half a second after its toast appears, which is
-   not long enough to read a welcome.
-
-   A strip of its own rather than the header's inline notice, which
-   already shares its row with the search box and four buttons. */
+/* ------------------------------------------------- sign-in greeting */
 
 .dashboard-welcome {
   display: flex;
@@ -1681,14 +1993,8 @@
   .dashboard-welcome { animation: none; }
 }
 
-
 /* =====================================================================
    PLACE BAR
-
-   Its own grid row, always rendered. The dashboard is a fixed-height
-   grid with a row per band; the sign-in greeting used to be a strip that
-   came and went, and while it showed it took a row and pushed the
-   register off the bottom of the screen. It now sits in this row.
    ===================================================================== */
 
 .dashboard-subbar {
@@ -1714,8 +2020,9 @@
 
 .dashboard-scope strong { color: var(--dash-maroon); }
 
+/* No auto margin: the breakdown switch already claims the free space on
+   this row, and two auto margins would split it and strand both. */
 .dashboard-welcome-inline {
-  margin-left: auto;
   align-self: center;
   padding: 5px 10px;
   font-size: 12.5px;
@@ -1770,8 +2077,6 @@
 
 .pf-clear { align-self: flex-end; }
 
-/* The register says which place it is showing, beside its own summary,
-   so a filtered total is never read as the province's. */
 .register-place-chip {
   font-size: 11px;
   font-weight: 650;
@@ -1802,9 +2107,6 @@
 
 /* =====================================================================
    NOTIFICATION BELL
-
-   Classes prefixed nb-; this stylesheet is bundled with the sign-in
-   screens and a generic name would reach into them.
    ===================================================================== */
 
 .nb { position: relative; }
@@ -1922,8 +2224,6 @@
   margin: 4px 8px 10px;
 }
 
-/* The pop-up is fixed to the window, not the header, so it is seen
-   wherever the administrator has scrolled to. */
 .nb-popup {
   position: fixed;
   z-index: 60;
@@ -1973,54 +2273,20 @@
   .nb-popup { animation: none; }
 }
 
-@media (max-width: 980px) {
-  .pf-field select { min-width: 120px; }
-  .dashboard-welcome-inline { margin-left: 0; }
-}
-
-
-/* A header button a role cannot use is shown greyed rather than hidden,
-   with the reason in its tooltip. */
-.approvals-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-
 /* =====================================================================
    PLACE PROFILE
-
-   The register card's view of one place: headline figures, the places
-   inside it as cards, then feeders, holdings and recent segments.
-   Scrolls inside the card, so the dashboard still fits one screen.
-   Classes prefixed pp-.
    ===================================================================== */
 
 .register-mode { margin-right: 8px; }
 
 .pp {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   padding: 2px 2px 4px;
 }
 
-.pp-head {
-  display: flex;
-  align-items: center;
-  gap: 10px 22px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
-  background: linear-gradient(90deg, #FBEFF4 0%, #FFFDF6 70%);
-  border: 1px solid #F0D3DF;
-  border-radius: 10px;
-}
-
-.pp-title { display: grid; gap: 1px; min-width: 0; }
-
+/* The place's name line. The figures strip that used to live here
+   repeated the tiles above it and cost this card half its height. */
 .pp-kicker {
   font-size: 10px;
   font-weight: 700;
@@ -2029,191 +2295,24 @@
   color: var(--dash-ink-muted);
 }
 
-.pp-title h3 {
-  margin: 0;
-  font-size: 16.5px;
-  font-weight: 750;
-  color: var(--dash-maroon);
-}
-
-.pp-up { justify-self: start; font-size: 11.5px; }
-
-.pp-figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 22px;
-  margin: 0 0 0 auto;
-}
-
-.pp-figures > div { display: grid; gap: 1px; }
-
-.pp-figures dt {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--dash-ink-muted);
-}
-
-.pp-figures dd {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 750;
-  color: var(--dash-ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.pp-figures small,
-.pp-num small {
-  font-size: 0.7em;
-  font-weight: 600;
-  color: var(--dash-ink-muted);
-}
-
-.pp-section h4 {
-  margin: 0 0 7px;
-  font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dash-maroon);
-}
+.pp-up { font-size: 11.5px; }
 
 .pp-hint {
-  margin-left: 8px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   color: var(--dash-ink-muted);
 }
 
-.pp-cards {
+/* Counted items beside measured line — never added together, and on a
+   narrow screen one above the other rather than two crushed columns. */
+.pp-two-up {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 9px;
-}
-
-.pp-card {
-  display: grid;
-  gap: 4px;
-  text-align: left;
-  font: inherit;
-  padding: 10px 12px;
-  color: var(--dash-ink);
-  background: #FFFFFF;
-  border: 1px solid var(--dash-line);
-  border-left: 4px solid var(--pp-accent);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.12s, border-color 0.15s;
-}
-
-.pp-card:hover {
-  border-color: var(--dash-line-strong);
-  border-left-color: var(--pp-accent);
-  box-shadow: 0 6px 18px rgba(43, 10, 22, 0.1);
-  transform: translateY(-1px);
-}
-
-.pp-card:focus-visible {
-  outline: 2px solid var(--dash-maroon);
-  outline-offset: 2px;
-}
-
-.pp-card-name { font-size: 13.5px; font-weight: 700; }
-
-.pp-card-name em {
-  margin-left: 6px;
-  font-style: normal;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--dash-ink-muted);
-}
-
-.pp-card-figs { font-size: 12px; color: var(--dash-ink-soft); }
-.pp-card-figs strong { font-size: 15px; color: var(--dash-ink); }
-.pp-card-km { font-size: 11.5px; color: var(--dash-ink-soft); }
-
-.pp-bar {
-  height: 5px;
-  margin-top: 2px;
-  background: #F1E8EC;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.pp-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--pp-accent);
-  border-radius: 999px;
-}
-
-.pp-card-share { font-size: 10.5px; color: var(--dash-ink-muted); }
-
-.pp-columns {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
+  align-items: start;
 }
-
-.pp-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.pp-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 9px;
-  font-size: 12px;
-  background: #FAF7F8;
-  border-radius: 7px;
-}
-
-.pp-list li.pp-measured { background: #F3F8F6; }
-
-.pp-strong { font-weight: 650; color: var(--dash-ink); }
-
-.pp-sub {
-  display: block;
-  font-size: 10.5px;
-  color: var(--dash-ink-muted);
-}
-
-.pp-num {
-  font-weight: 600;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  color: var(--dash-ink-soft);
-}
-
-.pp-empty,
-.pp-more {
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  color: var(--dash-ink-muted);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pp-card { transition: none; }
-  .pp-card:hover { transform: none; }
-}
-
-@media (max-width: 1180px) {
-  .pp-columns { grid-template-columns: 1fr 1fr; }
-  .pp-figures { margin-left: 0; }
-}
-
-@media (max-width: 760px) {
-  .pp-columns { grid-template-columns: 1fr; }
-}
-
 
 /* =====================================================================
    CLICKABLE TILES, TILE DETAILS, IMPORT PREVIEW
@@ -2226,8 +2325,6 @@
   gap: 12px;
 }
 
-/* A tile that opens its breakdown. Same look, plus a lift on hover and a
-   "Details" hint, so it reads as something to press. */
 .summary-card.is-clickable {
   width: 100%;
   font: inherit;
@@ -2261,14 +2358,8 @@
 .summary-card.is-clickable:hover .summary-more,
 .summary-card.is-clickable:focus-visible .summary-more { opacity: 1; }
 
-.td-dialog { max-width: 880px; }
-.td-body { display: grid; gap: 14px; }
-
-.td-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 14px;
-}
+.td-dialog { max-width: 960px; }
+.td-body { display: grid; gap: 16px; }
 
 .td-section h3 {
   display: flex;
@@ -2291,85 +2382,7 @@
 
 .td-empty { margin: 0; font-size: 12.5px; color: var(--dash-ink-muted); }
 
-.td-bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.td-bar {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    'name  value'
-    'track track'
-    'share share';
-  gap: 3px 10px;
-  padding: 7px 10px;
-  font: inherit;
-  text-align: left;
-  color: var(--dash-ink);
-  background: #FAF7F8;
-  border: 1px solid transparent;
-  border-radius: 8px;
-}
-
-.td-bar.is-clickable { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
-.td-bar.is-clickable:hover { background: #FFFFFF; border-color: var(--dash-line-strong); }
-.td-bar.is-clickable:focus-visible { outline: 2px solid var(--dash-maroon); outline-offset: 1px; }
-
-.td-bar-name { grid-area: name; font-size: 12.5px; font-weight: 650; }
-.td-bar-name em { margin-left: 6px; font-style: normal; font-weight: 500; font-size: 11px; color: var(--dash-ink-muted); }
-.td-bar-value { grid-area: value; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.td-bar-value small { font-size: 10px; font-weight: 600; color: var(--dash-ink-muted); }
-
-.td-bar-track {
-  grid-area: track;
-  height: 5px;
-  background: #EFE6EA;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.td-bar-track > span { display: block; height: 100%; border-radius: 999px; }
-.td-bar-share { grid-area: share; font-size: 10.5px; color: var(--dash-ink-muted); }
-
 .td-search { width: 100%; max-width: 420px; margin-bottom: 8px; }
-
-.td-units {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 6px;
-  max-height: 340px;
-  overflow-y: auto;
-}
-
-.td-unit {
-  width: 100%;
-  display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  font: inherit;
-  text-align: left;
-  color: var(--dash-ink);
-  background: #FFFFFF;
-  border: 1px solid var(--dash-line);
-  border-left: 3px solid var(--dash-maroon);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.td-unit:hover { background: #FCF7F9; }
-.td-unit-main strong { font-size: 12.5px; }
-.td-unit-main em { margin-left: 6px; font-style: normal; font-size: 10.5px; color: var(--dash-ink-muted); }
-.td-unit-ids { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; font-weight: 600; color: var(--dash-ink-soft); font-variant-numeric: tabular-nums; }
-.td-unit-meta { font-size: 10.5px; color: var(--dash-ink-muted); }
 
 .td-pager {
   display: flex;
@@ -2403,10 +2416,6 @@
 .import-change del { color: #A11B3E; }
 .import-change ins { color: #1F7A4C; text-decoration: none; font-weight: 650; }
 
-.hv-register .depot-table-wrapper { max-height: 560px; }
-
-/* Short breakdowns (types, ratings) sit side by side so the list of
-   units below them stays in view. */
-.td-body > .td-section > .td-bars {
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
+/* .hv-register was the second card on the HV Length page. That page is
+   one tabbed panel now, and the height it needs is set in hv-length.css
+   beside the rest of that page's rules. */

@@ -7,6 +7,7 @@ use App\Support\PlaceHoldings;
 use App\Support\TransformerSheetReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\IdSequence;
 use Illuminate\Validation\Rule;
 
 /**
@@ -37,15 +38,45 @@ class TransformerEntryController extends Controller
         'TX_MHP'       => 'Bulk (MHP)',
     ];
 
+    /**
+     * WHERE THIS DATA COMES FROM AND WHERE IT LANDS
+     *
+     *   Screen    Assets -> "+ Add assets", with a transformer type chosen
+     *   File      frontend/src/pages/Assets/AddAssetsDialog.jsx
+     *   Route     POST /api/network/transformers
+     *
+     *   transformers       one row per PHYSICAL UNIT
+     *     transformer_no   <- the line's Serial number box
+     *     old_sin_no       <- the line's old SIN box (blank -> NULL)
+     *     new_sin_no       <- the line's new SIN box (blank -> NULL)
+     *     substation_name  <- the line's Substation box
+     *     transformer_type <- DERIVED from the asset type's type_code,
+     *                         via REGISTER_TYPE above
+     *     capacity_kva     <- the line's kVA box
+     *     manufacturer     <- the line's Manufacturer box
+     *     csc_id           <- the CSC dropdown
+     *     install_date     <- the form footer, shared by every line
+     *     remarks          <- the form footer, shared by every line
+     *     quantity         <- fixed 1: a row here IS one unit
+     *     status           <- fixed ACTIVE
+     *     source_file      <- fixed 'dashboard-entry'
+     *
+     *   assets_used        the same entry in the history log, with
+     *                      transformer_id pointing at the row just
+     *                      created and asset_id left NULL.
+     *
+     * The full map for every write in the application is in
+     * docs/data-flow.md.
+     */
     public function store(Request $request)
     {
         $data = $request->validate([
-            'csc_id'       => ['required', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'csc_id'       => ['required', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
             'install_date' => ['nullable', 'date'],
             'remarks'      => ['nullable', 'string', 'max:500'],
 
             'transformers'                    => ['required', 'array', 'min:1', 'max:20'],
-            'transformers.*.asset_type_id'    => ['required', 'integer', Rule::exists('asset_types', 'asset_type_id')],
+            'transformers.*.asset_type_id'    => ['required', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
             'transformers.*.serial_no'        => ['required', 'string', 'max:60'],
             'transformers.*.old_sin_no'       => ['nullable', 'string', 'max:40'],
             'transformers.*.new_sin_no'       => ['nullable', 'string', 'max:40'],
@@ -108,7 +139,7 @@ class TransformerEntryController extends Controller
             }
         }
 
-        $place    = PlaceHoldings::place((int) $data['csc_id']);
+        $place    = PlaceHoldings::place((string) $data['csc_id']);
         $userId   = $request->user()?->getKey();
         $batchRef = bin2hex(random_bytes(16));
 
@@ -118,7 +149,10 @@ class TransformerEntryController extends Controller
             foreach ($items as $item) {
                 $type = $types[$item['asset_type_id']];
 
-                $id = DB::table('transformers')->insertGetId([
+                $id = IdSequence::next('transformers');
+
+                DB::table('transformers')->insert([
+                    'transformer_id'   => $id,
                     'csc_id'           => $place->csc_id,
                     'asset_type_id'    => $type->asset_type_id,
                     'old_sin_no'       => trim($item['old_sin_no'] ?? '') ?: null,
@@ -140,6 +174,7 @@ class TransformerEntryController extends Controller
 
                 // The usage log, against the transformer row just created.
                 DB::table('assets_used')->insert([
+                    'asset_usage_id'   => IdSequence::next('assets_used'),
                     'asset_id'         => null,
                     'transformer_id'   => $id,
                     'asset_type_id'    => $type->asset_type_id,
@@ -157,7 +192,7 @@ class TransformerEntryController extends Controller
 
                 $written[] = [
                     'transformer_id'  => $id,
-                    'asset_type_id'   => (int) $type->asset_type_id,
+                    'asset_type_id'   => (string) $type->asset_type_id,
                     'type_name'       => $type->type_name,
                     'category_name'   => 'Transformer',
                     'quantity'        => 1.0,
@@ -176,10 +211,10 @@ class TransformerEntryController extends Controller
                 : count($saved) . " transformers saved to {$place->csc_name} CSC.",
 
             'place' => [
-                'csc_id'        => (int) $place->csc_id,
+                'csc_id'        => (string) $place->csc_id,
                 'csc_code'      => $place->csc_code,
                 'csc_name'      => $place->csc_name,
-                'area_id'       => (int) $place->area_id,
+                'area_id'       => (string) $place->area_id,
                 'area_name'     => $place->area_name,
                 'province_name' => $place->province_name,
             ],
@@ -187,8 +222,8 @@ class TransformerEntryController extends Controller
             'added'        => $saved,
             'added_totals' => [['unit_of_measure' => 'nos', 'quantity' => (float) count($saved)]],
 
-            'place_totals'     => PlaceHoldings::totals((int) $place->csc_id),
-            'place_categories' => PlaceHoldings::categories((int) $place->csc_id),
+            'place_totals'     => PlaceHoldings::totals((string) $place->csc_id),
+            'place_categories' => PlaceHoldings::categories((string) $place->csc_id),
             'batch_ref'        => $batchRef,
         ], 201);
     }

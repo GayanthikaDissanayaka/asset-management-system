@@ -1,34 +1,54 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import axiosClient from '../../../api/axiosClient';
-import { SERIES } from './palette';
+import DataTable from './DataTable';
 import { toArray, num, pick, formatNumber, readUnits, readKva } from './data';
 import { describePlace } from './PlaceFilter';
 
 /*
- * One place, described -- instead of a table of rows.
+ * One place, described — one table at a time.
  *
- * Shown in the register card whenever the dashboard is narrowed to a
- * province, an area or a CSC. It answers what someone who searched for
- * "Badulla" actually wants to know, in the order they want it:
+ * Shown in the dashboard's single panel whenever a tab other than
+ * Overview is chosen. Each tab is one answer about the place the
+ * dashboard is narrowed to:
  *
- *   1. the place's headline figures;
- *   2. the places inside it, as cards -- select one to open it, so the
- *      province opens into areas and an area into CSCs;
- *   3. its feeders, what it holds, and the segments added most recently.
+ *   places     the areas or CSCs inside it — select a row to open it,
+ *              so the province opens into areas and an area into CSCs
+ *   feeders    HV line by feeder, longest first
+ *   assets     what is held here: counted items beside measured line
+ *   segments   the segments entered most recently, newest first
  *
- * The figures come from the same rows as the tiles above (per-CSC, so a
- * profile always agrees with the tiles), and the feeder lengths come from
+ * Which tab is showing is the parent's business, not this component's:
+ * the tabs sit in the panel's own toolbar alongside Overview, so there
+ * is one row of tabs on the dashboard rather than two.
+ *
+ * Tables rather than cards, because every one of these is a ranking —
+ * which CSC has the most line, which feeder is longest, what is held
+ * here and how much. A card grid hides that ordering; a column you can
+ * sort is the ranking.
+ *
+ * The figures come from the same rows as the tiles above (per-CSC, so
+ * this always agrees with the tiles), and the feeder lengths come from
  * the CSC share view, so a feeder crossing into a neighbouring CSC is
  * credited here only with the kilometres inside this place.
  *
- * UNITS ARE NEVER MIXED. Counted assets and measured line are listed
- * apart; nothing adds poles to kilometres.
+ * UNITS ARE NEVER MIXED. Counted assets and measured line get separate
+ * tables; nothing adds poles to kilometres.
  */
 
 const LEVEL_LABEL = { province: 'Province', area: 'Area', csc: 'CSC' };
 
-const FEEDERS_SHOWN = 6;
+/* Every tab is the same height, so switching between them does not move
+   the page under the reader, and the panel stays a fixed size — which is
+   what keeps the dashboard to one screen. */
+const PANEL_HEIGHT = 250;
+
+const nameCell = (name, sub) => (
+  <>
+    <span className="depot-name">{name}</span>
+    {sub && <span className="depot-code">{sub}</span>}
+  </>
+);
 
 const PlaceProfile = ({
   place,
@@ -39,6 +59,7 @@ const PlaceProfile = ({
   assetCategories,
   dataVersion,
   onPickPlace,
+  tab = 'places',
 }) => {
   const level = place?.cscId ? 'csc' : place?.areaId ? 'area' : place?.provinceId ? 'province' : null;
 
@@ -63,34 +84,9 @@ const PlaceProfile = ({
     return [];
   }, [depotSummary, level, place, areaById]);
 
-  const kmRows = useMemo(() => {
-    if (level === 'csc') {
-      return toArray(lineByCsc).filter((r) => String(r.csc_id) === String(place.cscId));
-    }
-    if (level === 'area') {
-      return toArray(lineLengths).filter((r) => String(r.area_id) === String(place.areaId));
-    }
-    if (level === 'province') {
-      return toArray(lineLengths).filter(
-        (r) => String(areaById.get(String(r.area_id))?.province_id) === String(place.provinceId)
-      );
-    }
-    return [];
-  }, [level, place, lineByCsc, lineLengths, areaById]);
-
-  const totals = useMemo(
-    () => ({
-      transformers: depotRows.reduce((s, r) => s + readUnits(r), 0),
-      kva: depotRows.reduce((s, r) => s + readKva(r), 0),
-      km: kmRows.reduce((s, r) => s + num(r.total_km), 0),
-      segments: kmRows.reduce((s, r) => s + num(r.segment_count), 0),
-    }),
-    [depotRows, kmRows]
-  );
-
   /* ---------------------------------------------- the places inside it */
 
-  const childRows = useMemo(() => {
+  const children = useMemo(() => {
     if (level === 'province') {
       return (placeOptions?.areas || [])
         .filter((a) => String(a.province_id) === String(place.provinceId))
@@ -132,29 +128,29 @@ const PlaceProfile = ({
     return [];
   }, [level, place, placeOptions, depotRows, lineLengths, lineByCsc]);
 
-  // Longest line first. A copy is sorted, never the memoised rows.
-  const children = useMemo(
-    () => [...childRows].sort((a, b) => b.km - a.km),
-    [childRows]
-  );
+  /* ------------------------------------------------ feeders + segments
 
-  /* ------------------------------------------------ feeders + segments */
+     Only fetched for the tabs that show them. The dashboard used to ask
+     for both on every place change whether or not anyone was looking at
+     them. */
 
   const [feeders, setFeeders] = useState(null);
   const [segments, setSegments] = useState(null);
 
-  useEffect(() => {
-    if (!level) return undefined;
-
-    let cancelled = false;
-    setFeeders(null);
-    setSegments(null);
-
-    const scope = {
+  const scope = useMemo(
+    () => ({
       province_id: level === 'province' ? place.provinceId : undefined,
       area_id: level === 'area' ? place.areaId : undefined,
       csc_id: level === 'csc' ? place.cscId : undefined,
-    };
+    }),
+    [level, place.provinceId, place.areaId, place.cscId]
+  );
+
+  useEffect(() => {
+    if (!level || tab !== 'feeders') return undefined;
+
+    let cancelled = false;
+    setFeeders(null);
 
     axiosClient
       .get('/network/hv-length', { params: { level: 'feeder', ...scope } })
@@ -165,10 +161,21 @@ const PlaceProfile = ({
         if (!cancelled) setFeeders([]);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [level, tab, scope, dataVersion]);
+
+  useEffect(() => {
+    if (!level || tab !== 'segments') return undefined;
+
+    let cancelled = false;
+    setSegments(null);
+
     // Newest first, so a segment entered a minute ago is at the top.
     axiosClient
       .get('/network/segments', {
-        params: { limit: 6, area_id: scope.area_id, csc_id: scope.csc_id },
+        params: { limit: 12, area_id: scope.area_id, csc_id: scope.csc_id },
       })
       .then(({ data }) => {
         if (!cancelled) setSegments(toArray(data));
@@ -180,12 +187,43 @@ const PlaceProfile = ({
     return () => {
       cancelled = true;
     };
-  }, [level, place.provinceId, place.areaId, place.cscId, dataVersion]);
+  }, [level, tab, scope, dataVersion]);
 
-  const namedFeeders = (feeders || []).filter((f) => f.group_code || f.group_name);
-  const unassignedKm = (feeders || [])
-    .filter((f) => !f.group_code && !f.group_name)
-    .reduce((s, f) => s + num(f.total_km), 0);
+  const feederRows = useMemo(
+    () =>
+      (feeders || [])
+        .filter((f) => f.group_code || f.group_name)
+        .map((f) => ({
+          key: `f-${f.group_id ?? 'none'}`,
+          name: f.group_code || f.group_name,
+          sub: f.group_name && f.group_name !== f.group_code ? f.group_name : '',
+          km: num(f.total_km),
+          segments: num(f.segment_count),
+        })),
+    [feeders]
+  );
+
+  const segmentRows = useMemo(
+    () =>
+      (segments || []).map((s) => ({
+        key: `s-${s.segment_register_id}`,
+        /* Sorted on the register id, not the code: "newest first" is the
+           order things were entered in, and segment codes do not run in
+           that order. The column is not shown — the id is plumbing.
+
+           Kept as a STRING. These ids are now text codes like
+           'SRG-00001', so num() would read every one of them as 0 and
+           the sort would do nothing. They are zero-padded to a fixed
+           width, which is what makes sorting them as text give the same
+           order as sorting the numbers they used to be. */
+        seq: String(s.segment_register_id ?? ''),
+        code: s.segment_code || `#${s.segment_register_id}`,
+        where: s.feeder_code || s.csc_name || '',
+        km: num(s.length_km),
+        voltage: s.voltage_level || '—',
+      })),
+    [segments]
+  );
 
   /* ------------------------------------------------------------ assets */
 
@@ -195,204 +233,164 @@ const PlaceProfile = ({
     for (const cat of toArray(assetCategories)) {
       for (const u of cat.by_unit || []) {
         if (num(u.quantity) <= 0) continue;
-        const row = { key: `${cat.category_id}-${u.unit_of_measure}`, name: cat.category_name, qty: num(u.quantity), unit: u.unit_of_measure };
+        const row = {
+          key: `${cat.category_id}-${u.unit_of_measure}`,
+          name: cat.category_name,
+          qty: num(u.quantity),
+          unit: u.unit_of_measure,
+        };
         (u.unit_of_measure === 'nos' ? c : m).push(row);
       }
     }
-    c.sort((a, b) => b.qty - a.qty);
-    m.sort((a, b) => b.qty - a.qty);
     return { counted: c, measured: m };
   }, [assetCategories]);
 
   if (!level) return null;
 
   const title = describePlace(place, placeOptions);
-  const countedTotal = counted.reduce((s, r) => s + r.qty, 0);
   const area = place.areaId ? areaById.get(String(place.areaId)) : null;
+  const unassignedKm = (feeders || [])
+    .filter((f) => !f.group_code && !f.group_name)
+    .reduce((s, f) => s + num(f.total_km), 0);
+
+  const HINTS = {
+    places: 'select a row to open it',
+    feeders:
+      unassignedKm > 0
+        ? `${formatNumber(unassignedKm, 2)} km not on a feeder`
+        : 'HV line by feeder, longest first',
+    assets: 'counted items and measured line, never added together',
+    segments: 'newest first',
+  };
 
   return (
     <div className="pp">
-      {/* ---------------------------------------------- headline strip */}
-      <div className="pp-head">
-        <div className="pp-title">
-          <span className="pp-kicker">{LEVEL_LABEL[level]}</span>
-          <h3>{title}</h3>
+      {/* One line, not a figures strip: the tiles above already carry
+          this place's headline numbers, and printing them twice was half
+          the height of this card. */}
+      <div className="pp-bar">
+        <span className="pp-kicker">{LEVEL_LABEL[level]}</span>
+        <strong className="pp-name">{title}</strong>
 
-          {/* Up one level, without going back to the pickers. */}
-          {level === 'csc' && area && (
-            <button
-              type="button"
-              className="link-button pp-up"
-              onClick={() => onPickPlace({ provinceId: place.provinceId, areaId: place.areaId, cscId: '' })}
-            >
-              &uarr; Whole {area.area_name} area
-            </button>
-          )}
-          {level === 'area' && (
-            <button
-              type="button"
-              className="link-button pp-up"
-              onClick={() => onPickPlace({ provinceId: place.provinceId, areaId: '', cscId: '' })}
-            >
-              &uarr; Whole province
-            </button>
-          )}
-        </div>
+        {level === 'csc' && area && (
+          <button
+            type="button"
+            className="link-button pp-up"
+            onClick={() => onPickPlace({ provinceId: place.provinceId, areaId: place.areaId, cscId: '' })}
+          >
+            &uarr; Whole {area.area_name} area
+          </button>
+        )}
+        {level === 'area' && (
+          <button
+            type="button"
+            className="link-button pp-up"
+            onClick={() => onPickPlace({ provinceId: place.provinceId, areaId: '', cscId: '' })}
+          >
+            &uarr; Whole province
+          </button>
+        )}
 
-        <dl className="pp-figures">
-          <div>
-            <dt>Transformers</dt>
-            <dd>{formatNumber(totals.transformers)}</dd>
-          </div>
-          <div>
-            <dt>Installed kVA</dt>
-            <dd>{formatNumber(totals.kva)}</dd>
-          </div>
-          <div>
-            <dt>HV line</dt>
-            <dd>
-              {formatNumber(totals.km, 2)} <small>km</small>
-            </dd>
-          </div>
-          <div>
-            <dt>Segments</dt>
-            <dd>{formatNumber(totals.segments)}</dd>
-          </div>
-          <div>
-            <dt>Feeders</dt>
-            <dd>{feeders === null ? '…' : formatNumber(namedFeeders.length)}</dd>
-          </div>
-          <div>
-            <dt>Counted assets</dt>
-            <dd>
-              {formatNumber(countedTotal)} <small>nos</small>
-            </dd>
-          </div>
-        </dl>
+        <span className="pp-hint">{HINTS[tab]}</span>
       </div>
 
-      {/* ------------------------------------- the places inside it */}
-      {children.length > 0 && (
-        <section className="pp-section">
-          <h4>
-            {level === 'province' ? 'Areas' : 'CSCs'} in {title}
-            <span className="pp-hint">select one to open it</span>
-          </h4>
-
-          <div className="pp-cards">
-            {children.map((c, i) => {
-              const share = totals.km > 0 ? (c.km / totals.km) * 100 : 0;
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  className="pp-card"
-                  style={{ '--pp-accent': SERIES[i % SERIES.length] }}
-                  onClick={() => onPickPlace(c.next)}
-                  aria-label={`Open ${c.name}`}
-                >
-                  <span className="pp-card-name">
-                    {c.name}
-                    {c.code && <em>{c.code}</em>}
-                  </span>
-                  <span className="pp-card-figs">
-                    <strong>{formatNumber(c.transformers)}</strong> transformers ·{' '}
-                    {formatNumber(c.kva)} kVA
-                  </span>
-                  <span className="pp-card-km">
-                    {formatNumber(c.km, 2)} km · {formatNumber(c.segments)} segments
-                  </span>
-                  <span className="pp-bar" aria-hidden="true">
-                    <span style={{ width: `${Math.min(share, 100)}%` }} />
-                  </span>
-                  <span className="pp-card-share">{share.toFixed(1)}% of the line here</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+      {tab === 'places' && (
+        <DataTable
+          columns={[
+            {
+              key: 'name',
+              label: level === 'province' ? 'Area' : 'CSC',
+              render: (r) => nameCell(r.name, r.code),
+            },
+            { key: 'transformers', label: 'Transformers', numeric: true, total: 'sum' },
+            { key: 'kva', label: 'Installed kVA', numeric: true, total: 'sum' },
+            { key: 'km', label: 'HV km', numeric: true, decimals: 2, total: 'sum', share: true },
+            { key: 'segments', label: 'Segments', numeric: true, total: 'sum' },
+          ]}
+          rows={children}
+          rowKey={(r) => r.key}
+          initialSortKey="km"
+          footerLabel={level === 'province' ? 'All areas' : 'All CSCs'}
+          emptyMessage="Nothing inside this place yet."
+          onRowClick={(r) => onPickPlace(r.next)}
+          rowTitle={(r) => `Open ${r.name}`}
+          isRowMuted={(r) => r.km === 0 && r.transformers === 0}
+          maxHeight={PANEL_HEIGHT}
+        />
       )}
 
-      {/* ------------------------------ feeders, assets, recent segments */}
-      <div className="pp-columns">
-        <section className="pp-section">
-          <h4>Feeders</h4>
-          {feeders === null ? (
-            <p className="pp-empty">Loading feeders…</p>
-          ) : namedFeeders.length === 0 ? (
-            <p className="pp-empty">No feeders recorded here.</p>
-          ) : (
-            <>
-              <ul className="pp-list">
-                {namedFeeders.slice(0, FEEDERS_SHOWN).map((f) => (
-                  <li key={f.group_id ?? f.group_code}>
-                    <span className="pp-strong">{f.group_code || f.group_name}</span>
-                    <span className="pp-num">
-                      {formatNumber(f.total_km, 2)} km · {formatNumber(f.segment_count)} seg
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {(namedFeeders.length > FEEDERS_SHOWN || unassignedKm > 0) && (
-                <p className="pp-more">
-                  {namedFeeders.length > FEEDERS_SHOWN &&
-                    `+${namedFeeders.length - FEEDERS_SHOWN} more feeders. `}
-                  {unassignedKm > 0 && `${formatNumber(unassignedKm, 2)} km has no feeder recorded.`}
-                </p>
-              )}
-            </>
-          )}
-        </section>
+      {tab === 'feeders' &&
+        (feeders === null ? (
+          <div className="chart-empty">Loading feeders…</div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Feeder', render: (r) => nameCell(r.name, r.sub) },
+              { key: 'km', label: 'HV km', numeric: true, decimals: 2, total: 'sum', share: true },
+              { key: 'segments', label: 'Segments', numeric: true, total: 'sum' },
+            ]}
+            rows={feederRows}
+            rowKey={(r) => r.key}
+            initialSortKey="km"
+            footerLabel="All feeders"
+            emptyMessage="No feeders recorded here."
+            dense
+            maxHeight={PANEL_HEIGHT}
+          />
+        ))}
 
-        <section className="pp-section">
-          <h4>What it holds</h4>
-          {counted.length === 0 && measured.length === 0 ? (
-            <p className="pp-empty">No assets recorded here.</p>
-          ) : (
-            <ul className="pp-list">
-              {counted.map((a) => (
-                <li key={a.key}>
-                  <span className="pp-strong">{a.name}</span>
-                  <span className="pp-num">
-                    {formatNumber(a.qty)} <small>nos</small>
-                  </span>
-                </li>
-              ))}
-              {measured.map((a) => (
-                <li key={a.key} className="pp-measured">
-                  <span className="pp-strong">{a.name}</span>
-                  <span className="pp-num">
-                    {formatNumber(a.qty, 2)} <small>{a.unit}</small>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {tab === 'assets' && (
+        <div className="pp-two-up">
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Counted' },
+              { key: 'qty', label: 'nos', numeric: true, total: 'sum', share: true },
+            ]}
+            rows={counted}
+            rowKey={(r) => r.key}
+            initialSortKey="qty"
+            footerLabel="Counted"
+            emptyMessage="Nothing counted here yet."
+            dense
+            maxHeight={PANEL_HEIGHT}
+          />
 
-        <section className="pp-section">
-          <h4>Latest segments</h4>
-          {segments === null ? (
-            <p className="pp-empty">Loading segments…</p>
-          ) : segments.length === 0 ? (
-            <p className="pp-empty">No segments recorded here.</p>
-          ) : (
-            <ul className="pp-list">
-              {segments.map((s) => (
-                <li key={s.register_id}>
-                  <span>
-                    <span className="pp-strong">{s.segment_code}</span>
-                    <span className="pp-sub">
-                      {[s.csc_name, s.feeder_code].filter(Boolean).join(' · ')}
-                    </span>
-                  </span>
-                  <span className="pp-num">{formatNumber(s.length_km, 3)} km</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Measured' },
+              { key: 'qty', label: 'km', numeric: true, decimals: 3, total: 'sum', share: true },
+            ]}
+            rows={measured}
+            rowKey={(r) => r.key}
+            initialSortKey="qty"
+            footerLabel="Measured"
+            emptyMessage="No line recorded against an asset here."
+            dense
+            maxHeight={PANEL_HEIGHT}
+          />
+        </div>
+      )}
+
+      {tab === 'segments' &&
+        (segments === null ? (
+          <div className="chart-empty">Loading segments…</div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'code', label: 'Segment', render: (r) => nameCell(r.code, r.where) },
+              { key: 'voltage', label: 'Voltage' },
+              { key: 'km', label: 'km', numeric: true, decimals: 3, total: 'sum' },
+            ]}
+            rows={segmentRows}
+            rowKey={(r) => r.key}
+            initialSortKey="seq"
+            initialSortDir="desc"
+            footerLabel="Latest"
+            emptyMessage="No segments recorded here."
+            dense
+            maxHeight={PANEL_HEIGHT}
+          />
+        ))}
     </div>
   );
 };

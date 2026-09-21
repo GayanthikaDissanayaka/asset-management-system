@@ -2,23 +2,26 @@ import React, { useMemo, useState } from 'react';
 
 import { num, formatNumber } from './data';
 
-/**
- * A sortable table driven by a column config.
+/*
+ * The one table every screen uses.
  *
- * The register card shows five different roll-ups. They differ only in
- * their columns, so they share this one component rather than each
- * carrying its own copy of the sorting, the sticky header and the totals
- * row.
+ * Sorting, a totals row and a share bar were already here. Three things
+ * were added so that a table can be the drill-down rather than only the
+ * summary, which is what the rest of the application now relies on:
  *
- * A column is:
- *   key      field on the row
- *   label    heading text
- *   numeric  right-aligned, tabular figures, sorts high-to-low first
- *   decimals fraction digits for numeric columns (default 0)
- *   total    'sum' to total the column in the footer, or omit
- *   render   optional cell renderer, (row) => node
- *   share    true to draw the proportion bar against the column total
+ *   onRowClick   the row becomes a button — Enter and Space work too, so
+ *                opening a place from a table is not a mouse-only move.
+ *   expandRender the row opens in place and shows whatever the caller
+ *                draws inside it, normally a second table. Categories
+ *                open into their types this way.
+ *   maxHeight    long tables scroll under their own sticky header
+ *                instead of pushing the page down.
+ *
+ * Numbers stay right-aligned and tabular so columns of figures line up
+ * on the decimal point; that is most of what makes a dense table
+ * readable at a glance.
  */
+
 const DataTable = ({
   columns,
   rows,
@@ -28,11 +31,19 @@ const DataTable = ({
   footerLabel,
   emptyMessage = 'Nothing recorded yet.',
   isRowMuted,
+  isRowActive,
+  onRowClick,
+  rowTitle,
+  expandRender,
+  dense = false,
+  maxHeight,
+  showFooter = true,
 }) => {
   const [sortKey, setSortKey] = useState(
     initialSortKey || columns.find((c) => c.numeric)?.key || columns[0].key
   );
   const [sortDir, setSortDir] = useState(initialSortDir);
+  const [openKeys, setOpenKeys] = useState(() => new Set());
 
   const sorted = useMemo(() => {
     const list = [...(rows || [])];
@@ -72,18 +83,32 @@ const DataTable = ({
     return sortDir === 'asc' ? ' ▲' : ' ▼';
   };
 
+  const toggleOpen = (key) =>
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   if (!rows || rows.length === 0) {
     return <div className="chart-empty">{emptyMessage}</div>;
   }
 
   const shareColumn = columns.find((c) => c.share);
   const shareTotal = shareColumn ? totals[shareColumn.key] : 0;
+  const span = columns.length + (expandRender ? 1 : 0) + (shareColumn ? 1 : 0);
 
   return (
-    <div className="depot-table-wrapper">
-      <table className="depot-table">
+    <div
+      className={`depot-table-wrapper${maxHeight ? ' is-scrolled' : ''}`}
+      style={maxHeight ? { maxHeight } : undefined}
+    >
+      <table className={`depot-table${dense ? ' is-dense' : ''}`}>
         <thead>
           <tr>
+            {expandRender && <th className="dt-expand-head" aria-label="Open" />}
+
             {columns.map((c) => (
               <th
                 key={c.key}
@@ -107,59 +132,117 @@ const DataTable = ({
         </thead>
 
         <tbody>
-          {sorted.map((row) => (
-            <tr
-              key={rowKey(row)}
-              className={isRowMuted && isRowMuted(row) ? 'is-empty' : undefined}
-            >
-              {columns.map((c) => (
-                <td key={c.key} className={c.numeric ? 'numeric' : undefined}>
-                  {c.render
-                    ? c.render(row)
-                    : c.numeric
-                    ? formatNumber(row[c.key], c.decimals ?? 0)
-                    : row[c.key] || ''}
-                </td>
-              ))}
+          {sorted.map((row) => {
+            const key = rowKey(row);
+            const open = openKeys.has(key);
+            const clickable = Boolean(onRowClick);
 
-              {shareColumn && (
-                <td className="numeric">
-                  <div className="share-cell">
-                    <div className="share-bar">
-                      <div
-                        className="share-fill"
-                        style={{
-                          width: `${
-                            shareTotal > 0
-                              ? Math.min(
-                                  (num(row[shareColumn.key]) / shareTotal) * 100,
-                                  100
-                                )
-                              : 0
-                          }%`,
+            const classes = [
+              isRowMuted && isRowMuted(row) ? 'is-empty' : '',
+              isRowActive && isRowActive(row) ? 'is-active' : '',
+              clickable ? 'is-clickable' : '',
+              open ? 'is-open' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
+
+            return (
+              <React.Fragment key={key}>
+                <tr
+                  className={classes || undefined}
+                  title={rowTitle ? rowTitle(row) : undefined}
+                  onClick={clickable ? () => onRowClick(row) : undefined}
+                  role={clickable ? 'button' : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onKeyDown={
+                    clickable
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onRowClick(row);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {expandRender && (
+                    <td className="dt-expand-cell">
+                      <button
+                        type="button"
+                        className="dt-expander"
+                        aria-expanded={open}
+                        aria-label={open ? 'Close' : 'Open'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleOpen(key);
                         }}
-                      />
-                    </div>
-                    <span>
-                      {shareTotal > 0
-                        ? ((num(row[shareColumn.key]) / shareTotal) * 100).toFixed(1)
-                        : '0.0'}
-                      %
-                    </span>
-                  </div>
-                </td>
-              )}
-            </tr>
-          ))}
+                      >
+                        {open ? '−' : '+'}
+                      </button>
+                    </td>
+                  )}
+
+                  {columns.map((c) => (
+                    <td key={c.key} className={c.numeric ? 'numeric' : undefined}>
+                      {c.render
+                        ? c.render(row)
+                        : c.numeric
+                        ? formatNumber(row[c.key], c.decimals ?? 0)
+                        : row[c.key] || ''}
+                    </td>
+                  ))}
+
+                  {shareColumn && (
+                    <td className="numeric">
+                      <div className="share-cell">
+                        <div className="share-bar">
+                          <div
+                            className="share-fill"
+                            style={{
+                              width: `${
+                                shareTotal > 0
+                                  ? Math.min(
+                                      (num(row[shareColumn.key]) / shareTotal) * 100,
+                                      100
+                                    )
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                        <span>
+                          {shareTotal > 0
+                            ? ((num(row[shareColumn.key]) / shareTotal) * 100).toFixed(1)
+                            : '0.0'}
+                          %
+                        </span>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+
+                {expandRender && open && (
+                  <tr className="dt-sub-row">
+                    <td colSpan={span} className="dt-sub-cell">
+                      <div className="dt-sub">{expandRender(row)}</div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </tbody>
 
+        {showFooter && (
         <tfoot>
           <tr>
+            {expandRender && <td className="dt-expand-cell" />}
+
             {columns.map((c, i) => {
               if (i === 0) {
                 return (
                   <td key={c.key}>
-                    {footerLabel} ({sorted.length})
+                    {footerLabel ? `${footerLabel} (${sorted.length})` : `${sorted.length} rows`}
                   </td>
                 );
               }
@@ -175,6 +258,7 @@ const DataTable = ({
             {shareColumn && <td className="numeric">100.0%</td>}
           </tr>
         </tfoot>
+        )}
       </table>
     </div>
   );

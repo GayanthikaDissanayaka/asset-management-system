@@ -196,7 +196,7 @@ const ROW_KEYS = {
   areas: (r) => r.area_id,
   cscs: (r) => r.csc_id,
   feeders: (r) => r.feeder_id,
-  segments: (r) => r.register_id,
+  segments: (r) => r.segment_register_id,
   assets: (r) => `${r.asset_type_id}-${r.unit_of_measure}`,
 };
 
@@ -216,6 +216,12 @@ const NetworkRegister = ({
   dataVersion = 0,
   onDataChanged,
   profile,
+  /* A counter the page bumps to open "+ HV Length" from its own header.
+     The button that matters most on this page was at the bottom of it,
+     which on a long register meant scrolling past everything to reach
+     the one thing you came to do. The dialog and its options loading
+     stay here, where the rest of the write path already lives. */
+  openAddSignal = 0,
 }) => {
   const [view, setView] = useState('transformers');
   const [cache, setCache] = useState({});
@@ -417,10 +423,18 @@ const NetworkRegister = ({
     }
   }, []);
 
-  const openAdd = () => {
+  const openAdd = useCallback(() => {
     setAddOpen(true);
     if (!options) loadOptions();
-  };
+  }, [options, loadOptions]);
+
+  // Zero is the initial value, so it is not a request to open anything.
+  useEffect(() => {
+    if (openAddSignal > 0) openAdd();
+    // openAdd is stable enough here; re-running on it would reopen the
+    // dialog every time the options finish loading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAddSignal]);
 
   /* The report, not the raw dump. It opens with the province, then a
      block per area, then a block per CSC, each answering what is

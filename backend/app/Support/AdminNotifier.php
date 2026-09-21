@@ -53,7 +53,11 @@ class AdminNotifier
             ])->filter()->implode(' · ');
 
             DB::table('notifications')->insert(
+                // One code per row, not one for the batch: each notice is
+                // its own row and needs its own key now that the database
+                // does not allocate them.
                 $admins->map(fn ($adminId) => [
+                    'notification_id' => IdSequence::next('notifications'),
                     'recipient_id'    => $adminId,
                     'type'            => self::ACCESS_REQUEST,
                     'title'           => "Access request from {$user->full_name}",
@@ -72,7 +76,7 @@ class AdminNotifier
      * A request was decided. Close it for every administrator, so nobody
      * keeps being prompted about something already handled.
      */
-    public static function requestResolved(int $subjectUserId, string $resolution): void
+    public static function requestResolved(string $subjectUserId, string $resolution): void
     {
         try {
             DB::table('notifications')

@@ -56,7 +56,7 @@ class NotificationController extends Controller
     }
 
     /** One notification seen. */
-    public function markRead(Request $request, int $notification)
+    public function markRead(Request $request, string $notification)
     {
         $updated = DB::table('notifications')
             ->where('notification_id', $notification)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\IdSequence;
 use Illuminate\Validation\Rule;
 
 /**
@@ -66,16 +67,16 @@ class NetworkController extends Controller
     {
         $v = $request->validate([
             'level'   => ['nullable', Rule::in(['province', 'area', 'csc', 'feeder'])],
-            'area_id' => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'province_id' => ['nullable', 'integer', Rule::exists('provinces', 'province_id')],
-            'csc_id'  => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'area_id' => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'province_id' => ['nullable', 'string', 'max:12', Rule::exists('provinces', 'province_id')],
+            'csc_id'  => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
             'voltage' => ['nullable', Rule::in(['33kV', '11kV', '400V'])],
         ]);
 
         $level = $v['level'] ?? 'area';
 
         $base = fn () => DB::table('v_segment_csc_share as s')
-            ->join('segment_register as sr', 'sr.register_id', '=', 's.register_id')
+            ->join('segment_register as sr', 'sr.segment_register_id', '=', 's.segment_register_id')
             ->join('csc_depots as d', 'd.csc_id', '=', 's.csc_id')
             ->join('areas as a', 'a.area_id', '=', 'd.area_id')
             ->leftJoin('feeders as f', 'f.feeder_id', '=', 'sr.feeder_id')
@@ -140,7 +141,7 @@ class NetworkController extends Controller
         // matches the rows above it.
         $totals = $base()
             ->selectRaw('COUNT(*) as segment_count')
-            ->selectRaw('COUNT(DISTINCT s.register_id) as distinct_segments')
+            ->selectRaw('COUNT(DISTINCT s.segment_register_id) as distinct_segments')
             ->selectRaw('COALESCE(SUM(s.is_split), 0) as crossing_count')
             ->selectRaw('COUNT(DISTINCT d.csc_id) as csc_count')
             ->selectRaw('COUNT(DISTINCT a.area_id) as area_count')
@@ -188,8 +189,8 @@ class NetworkController extends Controller
     public function assetsByCsc(Request $request)
     {
         $validated = $request->validate([
-            'asset_type_id' => ['nullable', 'integer', Rule::exists('asset_types', 'asset_type_id')],
-            'csc_id'        => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'asset_type_id' => ['nullable', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
+            'csc_id'        => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
         ]);
 
         return response()->json(
@@ -221,9 +222,9 @@ class NetworkController extends Controller
     public function segments(Request $request)
     {
         $validated = $request->validate([
-            'csc_id'    => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
-            'area_id'   => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'feeder_id' => ['nullable', 'integer', Rule::exists('feeders', 'feeder_id')],
+            'csc_id'    => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
+            'area_id'   => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'feeder_id' => ['nullable', 'string', 'max:12', Rule::exists('feeders', 'feeder_id')],
             'search'    => ['nullable', 'string', 'max:120'],
             'source'    => ['nullable', Rule::in(['all', 'entered', 'imported'])],
             'limit'     => ['nullable', 'integer', 'min:1', 'max:2000'],
@@ -275,7 +276,7 @@ class NetworkController extends Controller
                     })
             )
             ->select([
-                'sr.register_id',
+                'sr.segment_register_id',
                 'sr.segment_code',
                 'sr.length_km',
                 'sr.voltage_level',
@@ -292,7 +293,7 @@ class NetworkController extends Controller
                 'f.feeder_code',
                 'f.feeder_name',
             ])
-            ->orderByDesc('sr.register_id')
+            ->orderByDesc('sr.segment_register_id')
             ->limit($limit)
             ->get();
 
@@ -300,25 +301,25 @@ class NetworkController extends Controller
         // one per row.
         $breakdown = DB::table('segment_asset as sa')
             ->join('asset_types as t', 't.asset_type_id', '=', 'sa.asset_type_id')
-            ->whereIn('sa.register_id', $rows->pluck('register_id'))
+            ->whereIn('sa.segment_register_id', $rows->pluck('segment_register_id'))
             ->select([
-                'sa.register_id',
+                'sa.segment_register_id',
                 'sa.asset_type_id',
                 'sa.quantity',
                 'sa.unit_of_measure',
                 't.type_name',
             ])
             ->get()
-            ->groupBy('register_id');
+            ->groupBy('segment_register_id');
 
         // The CSCs a segment runs through, for the ones that cross a
         // boundary. Absent means the segment sits wholly in its own CSC.
         $portions = DB::table('segment_csc as sc')
             ->join('csc_depots as d', 'd.csc_id', '=', 'sc.csc_id')
             ->join('areas as a', 'a.area_id', '=', 'd.area_id')
-            ->whereIn('sc.register_id', $rows->pluck('register_id'))
+            ->whereIn('sc.segment_register_id', $rows->pluck('segment_register_id'))
             ->select([
-                'sc.register_id',
+                'sc.segment_register_id',
                 'sc.csc_id',
                 'sc.length_km',
                 'd.csc_code',
@@ -327,12 +328,12 @@ class NetworkController extends Controller
             ])
             ->orderByDesc('sc.length_km')
             ->get()
-            ->groupBy('register_id');
+            ->groupBy('segment_register_id');
 
         $rows = $rows->map(function ($row) use ($breakdown, $portions) {
-            $row->items = $breakdown->get($row->register_id, collect())->values();
+            $row->items = $breakdown->get($row->segment_register_id, collect())->values();
 
-            $parts = $portions->get($row->register_id, collect())->values();
+            $parts = $portions->get($row->segment_register_id, collect())->values();
             $row->csc_portions = $parts;
             $row->csc_count = $parts->count() > 0 ? $parts->count() : 1;
 
@@ -384,6 +385,37 @@ class NetworkController extends Controller
     /**
      * Records one segment, the CSCs it runs through, and what it carries.
      *
+     * WHERE THIS DATA COMES FROM AND WHERE IT LANDS
+     *
+     *   Screen    HV Length -> Network Register -> "+ HV Length"
+     *   File      frontend/src/pages/Dashboard/Components/AddSegmentDialog.jsx
+     *   Route     POST /api/network/segments
+     *
+     *   segment_register   one row, the segment itself
+     *     segment_code     <- the Segment code box (unique per CSC)
+     *     csc_id           <- DERIVED: the CSC holding the largest share
+     *     feeder_id        <- the Feeder dropdown
+     *     length_km        <- DERIVED: sum of every CSC portion entered
+     *     voltage_level    <- the Voltage dropdown, else 33kV
+     *     status           <- the Status dropdown, else ACTIVE
+     *     source_file      <- fixed 'dashboard-entry', so entered rows
+     *                         can be told apart from imported ones
+     *
+     *   segment_csc        one row per CSC, ONLY when it crosses a
+     *                      boundary (see the comment at the insert)
+     *     length_km        <- that CSC's box in the form
+     *
+     *   segment_asset      one row per line of "what it carries"
+     *     quantity         <- the line's Quantity box
+     *     unit_of_measure  <- THE ASSET-TYPE CATALOGUE, never the
+     *                         request: poles are counted in nos and line
+     *                         measured in km, and a request that could
+     *                         choose would put km in a column the
+     *                         roll-ups add up as a count.
+     *
+     * The full map for every write in the application is in
+     * docs/data-flow.md.
+     *
      * A segment may list several CSCs. Each carries the kilometres inside
      * that CSC, and those portions are what the area roll-up sums, so a
      * run crossing from one area into another puts only its own share in
@@ -397,17 +429,17 @@ class NetworkController extends Controller
     {
         $data = $request->validate([
             'cscs'             => ['required', 'array', 'min:1', 'max:6'],
-            'cscs.*.csc_id'    => ['required', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'cscs.*.csc_id'    => ['required', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
             'cscs.*.length_km' => ['nullable', 'numeric', 'min:0', 'max:100000'],
 
-            'feeder_id'     => ['nullable', 'integer', Rule::exists('feeders', 'feeder_id')],
+            'feeder_id'     => ['nullable', 'string', 'max:12', Rule::exists('feeders', 'feeder_id')],
             'segment_code'  => ['required', 'string', 'max:60'],
             'voltage_level' => ['nullable', Rule::in(['33kV', '11kV', '400V'])],
             'status'        => ['nullable', Rule::in(['ACTIVE', 'PLANNED', 'RETIRED'])],
             'remarks'       => ['nullable', 'string', 'max:2000'],
 
             'items'                 => ['nullable', 'array', 'max:60'],
-            'items.*.asset_type_id' => ['required', 'integer', Rule::exists('asset_types', 'asset_type_id')],
+            'items.*.asset_type_id' => ['required', 'string', 'max:12', Rule::exists('asset_types', 'asset_type_id')],
             'items.*.quantity'      => ['required', 'numeric', 'min:0', 'max:1000000'],
         ]);
 
@@ -418,7 +450,7 @@ class NetworkController extends Controller
         $portions = collect($data['cscs'])
             ->groupBy('csc_id')
             ->map(fn ($rows, $cscId) => [
-                'csc_id'    => (int) $cscId,
+                'csc_id'    => (string) $cscId,
                 'length_km' => round($rows->sum(fn ($r) => (float) ($r['length_km'] ?? 0)), 4),
             ])
             ->sortByDesc('length_km')
@@ -455,7 +487,14 @@ class NetworkController extends Controller
         $registerId = DB::transaction(function () use (
             $data, $code, $items, $units, $portions, $primaryCscId, $totalKm, $isSplit
         ) {
-            $registerId = DB::table('segment_register')->insertGetId([
+            /* The keys are readable codes now (SRG-01328), so the
+               database does not hand one out -- id_sequences does, and
+               insert() replaces insertGetId(), which only ever worked
+               because the column used to be AUTO_INCREMENT. */
+            $registerId = IdSequence::next('segment_register');
+
+            DB::table('segment_register')->insert([
+                'segment_register_id' => $registerId,
                 'csc_id'        => $primaryCscId,
                 'feeder_id'     => $data['feeder_id'] ?? null,
                 'segment_id'    => null,
@@ -479,7 +518,8 @@ class NetworkController extends Controller
             if ($isSplit) {
                 foreach ($portions as $portion) {
                     DB::table('segment_csc')->insert([
-                        'register_id' => $registerId,
+                        'segment_csc_id'      => IdSequence::next('segment_csc'),
+                        'segment_register_id' => $registerId,
                         'csc_id'      => $portion['csc_id'],
                         'length_km'   => $portion['length_km'],
                         'created_at'  => now(),
@@ -490,7 +530,8 @@ class NetworkController extends Controller
 
             foreach ($items as $item) {
                 DB::table('segment_asset')->insert([
-                    'register_id'     => $registerId,
+                    'segment_asset_id'  => IdSequence::next('segment_asset'),
+                    'segment_register_id'     => $registerId,
                     'asset_type_id'   => $item['asset_type_id'],
                     'quantity'        => $item['quantity'],
                     'unit_of_measure' => $units[$item['asset_type_id']] ?? 'nos',
@@ -506,7 +547,7 @@ class NetworkController extends Controller
             'message' => $isSplit
                 ? "Segment {$code} saved across {$portions->count()} CSCs."
                 : "Segment {$code} saved.",
-            'register_id'  => $registerId,
+            'segment_register_id'  => $registerId,
             'total_km'     => $totalKm,
             'csc_portions' => $portions->count(),
             'items_saved'  => $items->count(),

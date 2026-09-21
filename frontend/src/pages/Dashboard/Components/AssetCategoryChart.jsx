@@ -13,24 +13,6 @@ import {
 import { SERIES, INK, TOOLTIP_STYLE, TOOLTIP_LABEL_STYLE } from './palette';
 import { toArray, num, formatNumber } from './data';
 
-/**
- * What the province holds, by kind of asset — from /network/assets/catalog,
- * which reads v_asset_register across all three registers.
- *
- * This card replaced "Transformers by CSC". That chart and "Transformers
- * by Area" were the same measure at two levels, so the dashboard showed
- * transformer counts twice and never showed the other 1,400-odd assets
- * at all. Area keeps the transformer view; this one answers the question
- * nothing on the page answered: what else is out there.
- *
- * UNITS ARE NOT MIXED. asset_types counts switchgear and poles in `nos`
- * and measures conductor and line in `km`. Only the counted categories
- * are charted, because a bar of 1,362 beside a bar of 32.5 would invite
- * a comparison between a number of switches and a length of wire. The
- * measured categories are named in the card's subtitle and broken down
- * properly on the Assets page.
- */
-
 /** Only categories counted in whole items belong on one bar axis. */
 const COUNTED_UNIT = 'nos';
 
@@ -103,7 +85,7 @@ const AssetCategoryChart = ({ data }) => {
               position="right"
               offset={7}
               formatter={(v) => formatNumber(v)}
-              style={{ fontSize: 11, fontWeight: 600, fill: INK.secondary }}
+              style={{ fontSize: 12, fontWeight: 600, fill: INK.secondary }}
             />
           </Bar>
         </BarChart>

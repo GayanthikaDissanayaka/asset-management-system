@@ -76,8 +76,8 @@ class AuthController extends Controller
             'password'    => 'required|string|min:10',
 
             'designation' => 'nullable|string|max:100',
-            'area_id'     => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'csc_id'      => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'area_id'     => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'csc_id'      => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
             'requested_role' => ['nullable', Rule::in(self::REQUESTABLE_ROLES)],
         ]);
 

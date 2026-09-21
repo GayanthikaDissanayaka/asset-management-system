@@ -206,7 +206,7 @@ class SheetReader
     }
 
     /** The asset type's name, for reporting which columns were read. */
-    public function assetName(int $assetTypeId): string
+    public function assetName(string $assetTypeId): string
     {
         return $this->assetNames[$assetTypeId] ?? "type {$assetTypeId}";
     }
@@ -304,7 +304,7 @@ class SheetReader
         $candidates = [];
 
         foreach (DB::table('asset_types')->get(['asset_type_id', 'type_code', 'type_name']) as $t) {
-            $id = (int) $t->asset_type_id;
+            $id = (string) $t->asset_type_id;
             $this->assetNames[$id] = $t->type_name;
 
             $forms = [

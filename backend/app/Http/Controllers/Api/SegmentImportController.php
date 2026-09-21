@@ -7,6 +7,7 @@ use App\Support\PlaceResolver;
 use App\Support\SheetReader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\IdSequence;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
@@ -33,6 +34,31 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  */
 class SegmentImportController extends Controller
 {
+    /**
+     * WHERE THIS DATA COMES FROM AND WHERE IT LANDS
+     *
+     *   Screen    Dashboard sidebar -> "Import"
+     *   File      frontend/src/pages/Dashboard/Components/ImportDialog.jsx
+     *   Route     POST /api/network/import
+     *
+     * Writes the SAME THREE TABLES as POST /api/network/segments —
+     * segment_register, segment_csc and segment_asset — row by row from
+     * the uploaded sheet instead of from a form. The one difference:
+     *
+     *     source_file      <- the uploaded file's NAME, where a form
+     *                         entry writes the fixed 'dashboard-entry'.
+     *                         That is what lets anyone looking at a row
+     *                         later tell where it came from.
+     *
+     * Runs as a PREVIEW first: nothing is written until the request says
+     * to apply it. A segment code already present for the same CSC is
+     * reported as a clash and skipped, never overwritten — an import
+     * that silently replaced existing lengths would be very hard to
+     * notice and impossible to undo.
+     *
+     * The full map for every write in the application is in
+     * docs/data-flow.md.
+     */
     public function import(Request $request)
     {
         $request->validate([
@@ -178,7 +204,7 @@ class SegmentImportController extends Controller
             ];
             $g = &$groups[$code];
 
-            $cscId = (int) $place['csc_id'];
+            $cscId = (string) $place['csc_id'];
             $g['portions'][$cscId] = ($g['portions'][$cscId] ?? 0)
                 + $this->numeric($raw[$col['length_km'] ?? -1] ?? null);
 
@@ -280,7 +306,10 @@ class SegmentImportController extends Controller
                     continue;
                 }
 
-                $registerId = DB::table('segment_register')->insertGetId([
+                $registerId = IdSequence::next('segment_register');
+
+                DB::table('segment_register')->insert([
+                    'segment_register_id' => $registerId,
                     'csc_id'        => $primaryCscId,
                     'feeder_id'     => $g['feeder_id'],
                     'segment_id'    => null,
@@ -297,7 +326,8 @@ class SegmentImportController extends Controller
                 if ($isSplit) {
                     foreach ($g['portions'] as $cscId => $km) {
                         DB::table('segment_csc')->insert([
-                            'register_id' => $registerId,
+                            'segment_csc_id'      => IdSequence::next('segment_csc'),
+                            'segment_register_id' => $registerId,
                             'csc_id'      => $cscId,
                             'length_km'   => round($km, 4),
                             'created_at'  => now(),
@@ -308,7 +338,8 @@ class SegmentImportController extends Controller
 
                 foreach ($g['items'] as $typeId => $qty) {
                     DB::table('segment_asset')->insert([
-                        'register_id'     => $registerId,
+                        'segment_asset_id'    => IdSequence::next('segment_asset'),
+                        'segment_register_id'     => $registerId,
                         'asset_type_id'   => $typeId,
                         'quantity'        => round($qty, 4),
                         'unit_of_measure' => $units[$typeId] ?? 'nos',
@@ -372,8 +403,8 @@ class SegmentImportController extends Controller
             foreach ([$f->feeder_code, $f->feeder_name] as $form) {
                 $key = SheetReader::key((string) $form);
                 if ($key !== '') {
-                    $index[$key] ??= (int) $f->feeder_id;
-                    $index[str_replace('_', '', $key)] ??= (int) $f->feeder_id;
+                    $index[$key] ??= (string) $f->feeder_id;
+                    $index[str_replace('_', '', $key)] ??= (string) $f->feeder_id;
                 }
             }
         }

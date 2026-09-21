@@ -2,12 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { LayoutDashboard, Boxes, Network, Activity, Plus, X, Search, ChevronRight } from 'lucide-react';
 
-// ---------------------------------------------------------------------------
-// MOCK DATA — mirrors database/database_schema.sql exactly (same ids, names,
-// hierarchy and seed rows). In the real app this all comes from the Laravel
-// API instead of being hardcoded here.
-// ---------------------------------------------------------------------------
-
 const AREAS = [
   { area_id: 1, area_name: 'Mahiyanganaya' },
   { area_id: 2, area_name: 'Badulla' },
@@ -534,7 +528,7 @@ function AssetsView({ assets, setAssets, logs }) {
 
       <div className={`grid grid-cols-1 gap-4 ${selected ? 'lg:grid-cols-3' : ''}`}>
         <div className={selected ? 'lg:col-span-2' : ''}>
-          <div className="max-h-[520px] overflow-auto border border-slate-800">
+          <div className="max-h-130 overflow-auto border border-slate-800">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-slate-900 text-xs text-slate-500">
                 <tr>
@@ -642,7 +636,7 @@ function MaintenanceView({ logs, assets }) {
 
   return (
     <Panel title="Most recent activity, all depots (mirrors vw_asset_last_activity)">
-      <div className="max-h-[560px] overflow-auto">
+      <div className="max-h-140 overflow-auto">
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 bg-slate-900 text-xs text-slate-500">
             <tr>

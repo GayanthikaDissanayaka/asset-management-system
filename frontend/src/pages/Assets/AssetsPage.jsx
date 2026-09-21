@@ -10,33 +10,13 @@ import NotificationBell from '../Dashboard/Components/NotificationBell';
 
 import TransformerLookup from './TransformerLookup';
 import TransformerDialog from './TransformerDialog';
-import CategoryCards from './CategoryCards';
+import CategoryTable from './CategoryTable';
 import AddAssetsDialog from './AddAssetsDialog';
 
 import edlMark from '../Auth/edl-mark.png';
 
 import '../Dashboard/Dashbord.css';
 import './assets.css';
-
-/*
- * Every asset the province holds.
- *
- * All five panels read v_asset_register through /network/assets/*, and
- * all five take the same filters through the same shared scope on the
- * server. That is deliberate: a page where the tile said 3,125 and the
- * table below it listed something else would be worse than a page with
- * no totals at all.
- *
- * Before v_asset_register existed these numbers were 61, because the
- * roll-ups read the `assets` table alone while the province keeps its
- * real data in the transformer and switchgear registers. See
- * database/add_asset_explorer_views.sql.
- *
- * UNITS ARE NEVER MIXED. Counted items are `nos` and line is `km`, and
- * they are never added together — not in a tile, not in a card, not in
- * a table column. There is no "total assets" number on this page for
- * that reason; there is a count of records, and a quantity per unit.
- */
 
 const VIEWS = [
   { key: 'types', label: 'Asset types' },
@@ -45,15 +25,6 @@ const VIEWS = [
   { key: 'records', label: 'Records' },
 ];
 
-/*
- * "All assets" is read straight from `asset_categories` and
- * `asset_types`, so every category and type the database defines is
- * listed whether or not anything has been recorded against it. The
- * other views start from what exists and therefore cannot show that the
- * province holds no Zebra conductor at all.
- *
- * "Records" is the other question: the individual physical records.
- */
 const ALL_COLUMNS = [
   {
     key: 'type_name',
@@ -67,10 +38,7 @@ const ALL_COLUMNS = [
   },
   { key: 'category_name', label: 'Main asset' },
   {
-    /* Rendered per row, and deliberately NOT totalled. This column
-       holds counts of poles and kilometres of conductor together, so a
-       footer sum would be a number that measures nothing. Each cell
-       carries its own unit for the same reason. */
+    
     key: 'quantity',
     label: 'Quantity held',
     numeric: true,
@@ -86,10 +54,136 @@ const ALL_COLUMNS = [
   { key: 'area_count', label: 'Areas', numeric: true },
 ];
 
+/* One row per individual record. Both registers land here, so the source
+   is shown under the code rather than left for the reader to infer. */
+const RECORD_COLUMNS = [
+  {
+    key: 'asset_code',
+    label: 'Asset',
+    render: (r) => (
+      <>
+        <span className="depot-name">{r.asset_code || '—'}</span>
+        <span className="depot-code">{r.source}</span>
+      </>
+    ),
+  },
+  { key: 'type_name', label: 'Type' },
+  { key: 'category_name', label: 'Main asset' },
+  {
+    key: 'quantity',
+    label: 'Quantity',
+    numeric: true,
+    render: (r) => (
+      <>
+        {formatNumber(r.quantity, r.unit_of_measure === 'km' ? 3 : 0)}{' '}
+        <em className="ax-unit">{r.unit_of_measure}</em>
+      </>
+    ),
+  },
+  {
+    key: 'csc_name',
+    label: 'Where',
+    render: (r) => (
+      <>
+        <span className="depot-name">{r.csc_name}</span>
+        <span className="depot-code">{r.area_name}</span>
+      </>
+    ),
+  },
+  {
+    key: 'attached_ref',
+    label: 'Attached to',
+    render: (r) => (
+      <>
+        {r.attached_ref || '—'}
+        <span className="depot-code">{r.attached_to}</span>
+      </>
+    ),
+  },
+  {
+    key: 'condition_status',
+    label: 'Condition',
+    render: (r) => (r.condition_status === 'UNKNOWN' ? '—' : r.condition_status),
+  },
+];
+
 const PLACE_LEVELS = [
   { key: 'province', label: 'Province' },
   { key: 'area', label: 'Area' },
   { key: 'csc', label: 'CSC' },
+];
+
+/*
+ * The headline figures, and the table behind each.
+ *
+ * A tile is deliberately one number with one line under it — that is all
+ * a page should ask someone to read before they have chosen what they
+ * came for. Selecting it switches the panel below to the table that
+ * number came from, which is the whole shape of this page: a short
+ * summary first, working detail on request.
+ */
+const TOTAL_TILES = [
+  {
+    kind: 'records',
+    label: 'Asset records',
+    accent: 'accent-1',
+    view: 'records',
+    title: 'Every individual record, row by row',
+    value: (s) => formatNumber(s?.records),
+    hint: (s, filtered) =>
+      filtered ? 'Matching the filters' : 'Across the whole province',
+  },
+  {
+    kind: 'counted',
+    label: 'Counted items',
+    accent: 'accent-2',
+    view: 'all',
+    title: 'Every asset type, and what is held against each',
+    value: (s) => (
+      <>
+        {formatNumber(s?.counted_units)} <em className="ax-unit">nos</em>
+      </>
+    ),
+    hint: () => 'Transformers, switches, poles and plant',
+  },
+  {
+    kind: 'line',
+    label: 'Line recorded',
+    accent: 'accent-3',
+    view: 'places',
+    title: 'Line and counted items, place by place',
+    value: (s) => (
+      <>
+        {formatNumber(s?.line_km, 3)} <em className="ax-unit">km</em>
+      </>
+    ),
+    hint: () => 'Conductor and line, kept apart',
+  },
+  {
+    kind: 'transformers',
+    label: 'Transformers',
+    accent: 'accent-4',
+    view: 'types',
+    title: 'The main assets, opening into their types',
+    value: (s) => formatNumber(s?.transformers),
+    hint: (s) => `${formatNumber(s?.switchgear)} switchgear beside them`,
+  },
+  {
+    kind: 'spread',
+    label: 'Spread',
+    accent: 'accent-5',
+    view: 'places',
+    title: 'Province, area and CSC totals',
+    value: (s) => (
+      <>
+        {formatNumber(s?.csc_count)} <em className="ax-unit">CSCs</em>
+      </>
+    ),
+    hint: (s) =>
+      `in ${formatNumber(s?.area_count)} areas · ${formatNumber(
+        s?.type_count
+      )} asset types`,
+  },
 ];
 
 const EMPTY_FILTERS = {
@@ -123,17 +217,6 @@ const placeColumns = (level) => [
 
 const RECORDS_PER_PAGE = 50;
 
-/*
- * What can be downloaded, and where each one comes from.
- *
- * "Used assets" is the entry log — what was recorded, where it went,
- * when and by whom. It answers a question none of the others can: the
- * asset register only knows what a place holds NOW, because correcting
- * a quantity overwrites the figure it corrected.
- *
- * The full report is the written province/area/CSC document; the rest
- * are single sheets for anyone who wants to pivot the numbers.
- */
 const DOWNLOADS = [
   {
     key: 'report',
@@ -187,7 +270,6 @@ const AssetsPage = () => {
   const [records, setRecords] = useState(null);
   const [page, setPage] = useState(1);
 
-  const [openCategory, setOpenCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -225,17 +307,6 @@ const AssetsPage = () => {
 
   useEffect(loadOptions, [loadOptions]);
 
-  /*
-   * Arriving from the global search.
-   *
-   *   ?transformer=5          opens that transformer's detail
-   *   ?csc_id= / ?area_id=    filters the page to that place
-   *   ?search=36BDD001        finds one switch or asset record
-   *
-   * Read once per URL rather than continuously, so the filters stay
-   * editable afterwards: a reader who clears the CSC should not have it
-   * reinstated from a stale address bar on the next render.
-   */
   useEffect(() => {
     const tx = searchParams.get('transformer');
     const areaId = searchParams.get('area_id');
@@ -252,8 +323,9 @@ const AssetsPage = () => {
         search: term || '',
       });
 
-      // A single record is found in the list, not in a card grid.
-      if (term) setView('records');
+      // Place and text searches show the matching records, not a card
+      // summary that cannot expose each individual asset.
+      if (cscId || term) setView('records');
     }
   }, [searchParams]);
 
@@ -319,7 +391,7 @@ const AssetsPage = () => {
   // narrowed result would open on page 7 of 2 and look empty.
   useEffect(() => setPage(1), [params]);
 
-  const setFilter = (name, value) =>
+  const setFilter = (name, value) => {
     setFilters((f) => {
       const next = { ...f, [name]: value };
       if (name === 'provinceId') {
@@ -332,6 +404,40 @@ const AssetsPage = () => {
       if (name === 'categoryId') next.assetTypeId = '';
       return next;
     });
+
+    // A type, CSC or text search needs row-level detail, so move straight
+    // to the paged records table when one is entered.
+    if (['assetTypeId', 'cscId', 'search'].includes(name) && String(value).trim()) {
+      setView('records');
+    }
+  };
+
+  /* A row in the "by place" table is a place, so selecting it goes into
+     that place: a province opens its areas, an area opens its CSCs, and a
+     CSC — which has nothing below it — opens its records. */
+  const openPlaceRow = (row) => {
+    if (placeLevel === 'province') {
+      setFilter('provinceId', String(row.group_id));
+      setPlaceLevel('area');
+      return;
+    }
+    if (placeLevel === 'area') {
+      setFilter('areaId', String(row.group_id));
+      setPlaceLevel('csc');
+      return;
+    }
+    setFilter('cscId', String(row.group_id));
+  };
+
+  const typeChoices = useMemo(
+    () =>
+      (options?.types || []).filter(
+        (t) =>
+          !filters.categoryId ||
+          String(t.category_id) === String(filters.categoryId)
+      ),
+    [options, filters.categoryId]
+  );
 
   const cscChoices = useMemo(
     () =>
@@ -542,6 +648,21 @@ const AssetsPage = () => {
         </label>
 
         <label className="ax-filter">
+          <span>Asset type</span>
+          <select
+            value={filters.assetTypeId}
+            onChange={(e) => setFilter('assetTypeId', e.target.value)}
+          >
+            <option value="">All asset types</option>
+            {typeChoices.map((t) => (
+              <option key={t.asset_type_id} value={t.asset_type_id}>
+                {t.type_name} ({t.type_code})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="ax-filter">
           <span>Condition</span>
           <select
             value={filters.condition}
@@ -625,51 +746,28 @@ const AssetsPage = () => {
 
       {error && <div className="register-error">{error}</div>}
 
+      {/* The five figures worth knowing before anything else. Each one
+          opens the table it was added up from, so the page starts simple
+          and the detail is one click away rather than all at once. */}
       <section className="summary-cards ax-totals">
-        <div className="summary-card accent-1">
-          <span className="summary-label">Asset records</span>
-          <span className="summary-value">{formatNumber(summary?.records)}</span>
-          <span className="summary-hint">
-            {filtered ? 'Matching the filters' : 'Across the whole province'}
-          </span>
-        </div>
-
-        <div className="summary-card accent-2">
-          <span className="summary-label">Counted items</span>
-          <span className="summary-value">
-            {formatNumber(summary?.counted_units)} <em className="ax-unit">nos</em>
-          </span>
-          <span className="summary-hint">
-            Transformers, switches, poles and plant
-          </span>
-        </div>
-
-        <div className="summary-card accent-3">
-          <span className="summary-label">Line recorded</span>
-          <span className="summary-value">
-            {formatNumber(summary?.line_km, 3)} <em className="ax-unit">km</em>
-          </span>
-          <span className="summary-hint">Conductor and line, kept apart</span>
-        </div>
-
-        <div className="summary-card accent-4">
-          <span className="summary-label">Transformers</span>
-          <span className="summary-value">{formatNumber(summary?.transformers)}</span>
-          <span className="summary-hint">
-            {formatNumber(summary?.switchgear)} switchgear beside them
-          </span>
-        </div>
-
-        <div className="summary-card accent-5">
-          <span className="summary-label">Spread</span>
-          <span className="summary-value">
-            {formatNumber(summary?.csc_count)} <em className="ax-unit">CSCs</em>
-          </span>
-          <span className="summary-hint">
-            in {formatNumber(summary?.area_count)} areas ·{' '}
-            {formatNumber(summary?.type_count)} asset types
-          </span>
-        </div>
+        {TOTAL_TILES.map((tile) => (
+          <button
+            type="button"
+            key={tile.kind}
+            className={`summary-card is-clickable ${tile.accent}`}
+            onClick={() => setView(tile.view)}
+            title={tile.title}
+          >
+            <span className="summary-label">
+              {tile.label}
+              <span className="summary-more" aria-hidden="true">
+                Details &rarr;
+              </span>
+            </span>
+            <span className="summary-value">{tile.value(summary)}</span>
+            <span className="summary-hint">{tile.hint(summary, filtered)}</span>
+          </button>
+        ))}
       </section>
 
       <section className="dashboard-card ax-main">
@@ -725,14 +823,14 @@ const AssetsPage = () => {
         {view === 'types' && (
           <>
             <p className="ax-block-hint ax-view-hint">
-              Each card is a main asset. Open one to see the types inside it, and
-              select a type to filter everything on this page to it.
+              Each row is a main asset. Open one with <strong>+</strong> to see the
+              types inside it, and select a type to open its records. Counted
+              items and line are in separate columns because they are different
+              units.
             </p>
 
-            <CategoryCards
+            <CategoryTable
               categories={categories}
-              openId={openCategory}
-              onToggle={setOpenCategory}
               typeFilter={filters.assetTypeId}
               onPickType={(id) => setFilter('assetTypeId', id)}
             />
@@ -745,7 +843,8 @@ const AssetsPage = () => {
             <p className="ax-block-hint ax-view-hint">
               An asset belongs to exactly one CSC, so these levels all add up to
               the same records. Counted items and line are kept in separate
-              columns because they are different units.
+              columns because they are different units. Select a row to open
+              the place inside it.
             </p>
 
             <DataTable
@@ -756,6 +855,12 @@ const AssetsPage = () => {
               footerLabel="Total"
               emptyMessage="Nothing matches these filters."
               isRowMuted={(r) => num(r.records) === 0}
+              onRowClick={openPlaceRow}
+              rowTitle={(r) =>
+                placeLevel === 'csc'
+                  ? `Every record in ${r.group_name}`
+                  : `Open ${r.group_name}`
+              }
             />
           </>
         )}
@@ -767,7 +872,7 @@ const AssetsPage = () => {
               Every category and type defined in <code>asset_categories</code> and{' '}
               <code>asset_types</code>, with what is held against each. Types
               holding nothing are listed too — that a type has no records is
-              itself worth seeing.
+              itself worth seeing. Select a row to open that type's records.
             </p>
 
             <DataTable
@@ -778,6 +883,23 @@ const AssetsPage = () => {
               footerLabel="All types"
               emptyMessage="No asset types are defined."
               isRowMuted={(r) => num(r.records) === 0}
+              isRowActive={(r) =>
+                String(filters.assetTypeId) === String(r.asset_type_id)
+              }
+              onRowClick={(r) =>
+                setFilter(
+                  'assetTypeId',
+                  String(filters.assetTypeId) === String(r.asset_type_id)
+                    ? ''
+                    : String(r.asset_type_id)
+                )
+              }
+              rowTitle={(r) =>
+                String(filters.assetTypeId) === String(r.asset_type_id)
+                  ? 'Showing only this type. Select again to clear.'
+                  : `Show only ${r.type_name}`
+              }
+              maxHeight={560}
             />
           </>
         )}
@@ -797,54 +919,15 @@ const AssetsPage = () => {
               <div className="chart-empty">Nothing matches these filters.</div>
             ) : (
               <>
-                <div className="depot-table-wrapper ax-records">
-                  <table className="depot-table">
-                    <thead>
-                      <tr>
-                        <th>Asset</th>
-                        <th>Type</th>
-                        <th>Main asset</th>
-                        <th className="numeric">Quantity</th>
-                        <th>Where</th>
-                        <th>Attached to</th>
-                        <th>Condition</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {records.rows.map((r) => (
-                        <tr key={`${r.source}-${r.source_id}`}>
-                          <td>
-                            <span className="depot-name">{r.asset_code || '—'}</span>
-                            <span className="depot-code">{r.source}</span>
-                          </td>
-                          <td>{r.type_name}</td>
-                          <td>{r.category_name}</td>
-                          <td className="numeric">
-                            {formatNumber(
-                              r.quantity,
-                              r.unit_of_measure === 'km' ? 3 : 0
-                            )}{' '}
-                            <em className="ax-unit">{r.unit_of_measure}</em>
-                          </td>
-                          <td>
-                            <span className="depot-name">{r.csc_name}</span>
-                            <span className="depot-code">{r.area_name}</span>
-                          </td>
-                          <td>
-                            {r.attached_ref || '—'}
-                            <span className="depot-code">{r.attached_to}</span>
-                          </td>
-                          <td>
-                            {r.condition_status === 'UNKNOWN'
-                              ? '—'
-                              : r.condition_status}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                  columns={RECORD_COLUMNS}
+                  rows={records.rows}
+                  rowKey={(r) => `${r.source}-${r.source_id}`}
+                  initialSortKey="quantity"
+                  footerLabel="On this page"
+                  emptyMessage="Nothing matches these filters."
+                  maxHeight={560}
+                />
 
                 <div className="ax-pager">
                   <button

@@ -574,9 +574,9 @@ class SpreadsheetController extends Controller
     {
         $portions = DB::table('segment_csc as sc')
             ->join('csc_depots as d', 'd.csc_id', '=', 'sc.csc_id')
-            ->select('sc.register_id', 'd.csc_code', 'sc.length_km')
+            ->select('sc.segment_register_id', 'd.csc_code', 'sc.length_km')
             ->get()
-            ->groupBy('register_id');
+            ->groupBy('segment_register_id');
 
         return DB::table('segment_register as sr')
             ->join('csc_depots as d', 'd.csc_id', '=', 'sr.csc_id')
@@ -585,14 +585,14 @@ class SpreadsheetController extends Controller
             ->select([
                 'sr.segment_code', 'd.csc_code', 'd.csc_name', 'a.area_name',
                 'f.feeder_code', 'sr.voltage_level', 'sr.length_km',
-                'sr.status', 'sr.source_file', 'sr.remarks', 'sr.register_id',
+                'sr.status', 'sr.source_file', 'sr.remarks', 'sr.segment_register_id',
             ])
-            ->orderByDesc('sr.register_id')
+            ->orderByDesc('sr.segment_register_id')
             ->get()
             ->map(function ($r) use ($portions) {
-                $parts = $portions->get($r->register_id, collect());
+                $parts = $portions->get($r->segment_register_id, collect());
                 $row = (array) $r;
-                unset($row['register_id']);
+                unset($row['segment_register_id']);
                 $row['crosses_cscs'] = $parts->count() ?: 1;
                 $row['csc_split'] = $parts
                     ->map(fn ($p) => "{$p->csc_code}: {$p->length_km}")
@@ -761,7 +761,7 @@ class SpreadsheetController extends Controller
                 'used_for', 'recorded_by_name', 'batch_ref',
             ])
             ->orderByDesc('recorded_at')
-            ->orderByDesc('used_id')
+            ->orderByDesc('asset_usage_id')
             ->get()
             ->map(fn ($r) => (array) $r)
             ->all();

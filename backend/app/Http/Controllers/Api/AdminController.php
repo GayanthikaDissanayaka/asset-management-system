@@ -81,12 +81,12 @@ class AdminController extends Controller
      * area, would hold a role that points at nothing, so the scope those
      * roles need is required rather than optional.
      */
-    public function approve(Request $request, int $userId)
+    public function approve(Request $request, string $userId)
     {
         $data = $request->validate([
             'role_code' => ['required', Rule::in(self::GRANTABLE_ROLES)],
-            'area_id'   => ['nullable', 'integer', Rule::exists('areas', 'area_id')],
-            'csc_id'    => ['nullable', 'integer', Rule::exists('csc_depots', 'csc_id')],
+            'area_id'   => ['nullable', 'string', 'max:12', Rule::exists('areas', 'area_id')],
+            'csc_id'    => ['nullable', 'string', 'max:12', Rule::exists('csc_depots', 'csc_id')],
         ]);
 
         $user = User::find($userId);
@@ -168,7 +168,7 @@ class AdminController extends Controller
      * asked, and when, is worth keeping, and login already refuses an
      * inactive account.
      */
-    public function decline(Request $request, int $userId)
+    public function decline(Request $request, string $userId)
     {
         $user = User::find($userId);
 
